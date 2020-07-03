@@ -3,21 +3,15 @@
 # !@author: superMC @email: 18758266469@163.com
 # !@fileName: voc.py
 
-from __future__ import absolute_import
-from __future__ import division
 import torch
 from .voc_dataset import VOCBboxDataset
 from skimage import transform as sktsf
 from torchvision import transforms as tvtsf
-from data import util
+from faster_rcnn.data.transforms import image_utils
 import numpy as np
-from utils.config import opt
 
 
 def inverse_normalize(img):
-    if opt.caffe_pretrain:
-        img = img + (np.array([122.7717, 115.9465, 102.9801]).reshape((3, 1, 1)))
-        return img[::-1, :, :]
     # approximate un-normalize for visualize
     return (img * 0.225 + 0.45).clip(min=0, max=1) * 255
 
@@ -29,7 +23,7 @@ def pytorch_normalze(img):
     """
     normalize = tvtsf.Normalize(mean=[0.485, 0.456, 0.406],
                                 std=[0.229, 0.224, 0.225])
-    img = normalize(t.from_numpy(img))
+    img = normalize(torch.from_numpy(img))
     return img.numpy()
 
 
@@ -72,10 +66,8 @@ def preprocess(img, min_size=600, max_size=1000):
     img = sktsf.resize(img, (C, H * scale, W * scale), mode='reflect', anti_aliasing=False)
     # both the longer and shorter should be less than
     # max_size and min_size
-    if opt.caffe_pretrain:
-        normalize = caffe_normalize
-    else:
-        normalize = pytorch_normalze
+
+    normalize = pytorch_normalze
     return normalize(img)
 
 
@@ -91,12 +83,12 @@ class Transform(object):
         img = preprocess(img, self.min_size, self.max_size)
         _, o_H, o_W = img.shape
         scale = o_H / H
-        bbox = util.resize_bbox(bbox, (H, W), (o_H, o_W))
+        bbox = image_utils.resize_bbox(bbox, (H, W), (o_H, o_W))
 
         # horizontally flip
-        img, params = util.random_flip(
+        img, params = image_utils.random_flip(
             img, x_random=True, return_param=True)
-        bbox = util.flip_bbox(
+        bbox = image_utils.flip_bbox(
             bbox, (o_H, o_W), x_flip=params['x_flip'])
 
         return img, bbox, label, scale

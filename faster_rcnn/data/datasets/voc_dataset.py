@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 
-from .util import read_image
+from faster_rcnn.data.transforms.image_utils import read_image
 
 
 class VOCBboxDataset:

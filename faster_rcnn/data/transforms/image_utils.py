@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # !@time: 2020/7/3 下午7:41
 # !@author: superMC @email: 18758266469@163.com
-# !@fileName: image_tools.py
+# !@fileName: image_utils.py
 
 import numpy as np
 from PIL import Image

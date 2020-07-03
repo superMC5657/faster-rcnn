@@ -3,9 +3,6 @@ import math
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 
-from faster_rcnn.model.backbone.rcnn.faster_rcnn import _fasterRCNN
-from faster_rcnn.model.utils.config import cfg
-
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152']
 
@@ -208,5 +205,3 @@ def resnet152(pretrained=False):
     if pretrained:
         model.load_state_dict(model_zoo.load_url(model_urls['resnet152']))
     return model
-
-
