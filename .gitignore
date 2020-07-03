@@ -1,1 +1,4 @@
 .idea
+/images/
+/checkpoints/
+*__pycache__
