@@ -3,6 +3,7 @@
 # !@author: superMC @email: 18758266469@163.com
 # !@fileName: rcnn.py
 from .net_structure._faster_rcnn import baseFasterRCNN
+from .rpn
 
 
 class FasterRCNN(baseFasterRCNN):
