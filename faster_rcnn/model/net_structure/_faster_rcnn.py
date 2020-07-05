@@ -7,7 +7,7 @@ from torch import nn
 from torchvision.ops import nms
 import numpy as np
 from faster_rcnn.data.transforms.image_utils import preprocess
-from faster_rcnn.model.utils.bbox_tools import loc2bbox
+from faster_rcnn.model.utils.bbox_tool import loc2bbox
 from faster_rcnn.utils import array_tool
 from torch.nn import functional as F
 from faster_rcnn.utils.config import opt
@@ -109,7 +109,7 @@ class baseFasterRCNN(nn.Module):
 
             roi_cls_loc = roi_cls_loc * std + mean
             roi_cls_loc = roi_cls_loc.view(-1, self.n_class, 4)
-            roi_cls_loc.contiguous()
+
             rois = rois.view(-1, 1, 4).expand_as(roi_cls_loc)
 
             cls_bbox = loc2bbox(array_tool.tonumpy(rois).reshape((-1, 4)),
