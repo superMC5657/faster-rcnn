@@ -205,3 +205,14 @@ def resnet152(pretrained=False):
     if pretrained:
         model.load_state_dict(model_zoo.load_url(model_urls['resnet152']))
     return model
+
+
+layers = {18: resnet18, 34: resnet34, 50: resnet50, 101: resnet101, 152: resnet152}
+
+
+def resnet(num=101, pretrained=False):
+    model = layers[num](pretrained)
+
+
+if __name__ == '__main__':
+    resnet(101, False)

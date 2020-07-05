@@ -5,8 +5,8 @@
 
 import numpy as np
 import torch
-from torchvision.ops import nms
-from .bbox_tools import bbox2loc, bbox_iou, loc2bbox
+from torchvision.ops import nms, box_iou
+from .bbox_tools import bbox2loc, loc2bbox
 
 
 class ProposalTargetCreator():
@@ -22,7 +22,15 @@ class ProposalTargetCreator():
 
     def __call__(self, roi, bbox, label):
         n_bbox, _ = bbox.shape
-        roi = np.concatenate((roi, bbox))
+        roi = np.concatenate((roi, bbox), axis=0)
+        pos_roi_per_image = np.round(self.n_sample * self.pos_ratio)
+        iou = box_iou(roi, bbox)
+        gt_assignment = iou.argmax(axis=1)
+        max_iou = iou.max(axis=1)
+        gt_roi_label = label[gt_assignment] + 1
+
+        pos_index = np.where(max_iou >= self.pos_iou_thresh)[0]
+        pos_roi_per_this_image = int(min(pos_roi_per_image, pos_index.size))
 
 
 def _unmap(data, count, index, fill=0):
@@ -37,5 +45,26 @@ def _unmap(data, count, index, fill=0):
     return ret
 
 
+def _get_inside_index(anchor, H, W):
+    index_inside = np.where((anchor[:, 0] >= 0) & (anchor[:, 1] >= 0) & (anchor[:, 2] <= H) & (anchor[:, 3] <= W))[0]
+    return index_inside
 
 
+class ProposalCreator:
+    def __init__(self, parent_model, nms_thresh=0.7, n_train_pre_nms=12000, n_train_post_nms=2000, n_test_pre_nms=6000,
+                 n_test_post_nms=300, min_size=300):
+        self.min_size = min_size
+        self.n_test_post_nms = n_test_post_nms
+        self.n_test_pre_nms = n_test_pre_nms
+        self.n_train_post_nms = n_train_post_nms
+        self.parent_model = parent_model
+        self.nms_thresh = nms_thresh
+        self.n_train_pre_nms = n_train_pre_nms
+
+    def __call__(self, loc, score, anchor, img_size, scale=1.):
+        if self.parent_model.training:
+            n_pre_nms = self.n_train_pre_nms
+            n_post_nms = self.n_train_post_nms
+        else:
+            n_pre_nms = self.n_test_pre_nms
+            n_post_nms = self.n_test_post_nms

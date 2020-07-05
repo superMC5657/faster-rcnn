@@ -7,7 +7,10 @@ from torch import nn
 from torchvision.ops import nms
 import numpy as np
 from faster_rcnn.data.transforms.image_utils import preprocess
+from faster_rcnn.model.utils.bbox_tools import loc2bbox
 from faster_rcnn.utils import array_tool
+from torch.nn import functional as F
+from faster_rcnn.utils.config import opt
 
 
 def nograd(func):
@@ -19,14 +22,15 @@ def nograd(func):
 
 
 class baseFasterRCNN(nn.Module):
-    def __init__(self, extractor, rpn, head):
+    def __init__(self, extractor, rpn, head, loc_normalize_mean=(0., 0., 0., 0.),
+                 loc_normalize_std=(0.1, 0.1, 0.2, 0.2)):
         super(baseFasterRCNN, self).__init__()
         self.extractor = extractor
         self.rpn = rpn
         self.head = head
-
-        self.loc_normalize_mean = (0., 0., 0., 0.)
-        self.loc_normalize_std = (0.1, 0.2, 0.2, 0.2)
+        self.optimizer = None
+        self.loc_normalize_mean = loc_normalize_mean
+        self.loc_normalize_std = loc_normalize_std
         self.use_preset('evaluate')
 
     @property
@@ -56,9 +60,9 @@ class baseFasterRCNN(nn.Module):
         bbox = list()
         label = list()
         score = list()
-
+        raw_cls_bbox = raw_cls_bbox.reshape((-1, self.n_class, 4))
         for l in range(1, self.n_class):
-            cls_bbox_l = raw_cls_bbox.reshape((raw_cls_bbox, raw_prob))
+            cls_bbox_l = raw_cls_bbox[:, l, :]
             prob_l = raw_prob[:, l]
             mask = prob_l > self.score_thresh
             cls_bbox_l = cls_bbox_l[mask]
@@ -73,7 +77,7 @@ class baseFasterRCNN(nn.Module):
         return bbox, label, score
 
     # maybe batch inference
-    @nograd
+    @torch.no_grad()
     def predict(self, imgs, sizes=None, visualize=False):
         self.eval()
         if visualize:
@@ -96,3 +100,53 @@ class baseFasterRCNN(nn.Module):
             img = array_tool.totensor(img[None]).float()
             scale = img.shape[3] / size[1]
             roi_cls_loc, roi_scores, rois, _ = self.forward(img, scale)
+            roi_scores = roi_scores.data
+            roi_cls_loc = roi_cls_loc.data
+            rois = array_tool.totensor(rois) / scale
+
+            mean = torch.Tensor(self.loc_normalize_mean).cuda().repeat(self.n_class)[None]
+            std = torch.Tensor(self.loc_normalize_std).cuda().repeat(self.n_class)[None]
+
+            roi_cls_loc = roi_cls_loc * std + mean
+            roi_cls_loc = roi_cls_loc.view(-1, self.n_class, 4)
+            roi_cls_loc.contiguous()
+            rois = rois.view(-1, 1, 4).expand_as(roi_cls_loc)
+
+            cls_bbox = loc2bbox(array_tool.tonumpy(rois).reshape((-1, 4)),
+                                array_tool.tonumpy(roi_cls_loc).reshape((-1, 4)))
+
+            cls_bbox = array_tool.totensor(cls_bbox)
+            cls_bbox = cls_bbox.view(-1, self.n_class * 4)
+
+            # clip bbox
+            cls_bbox[:, 0::2] = cls_bbox[:, 0::2].clamp(min=0, max=size[0])  # x
+            cls_bbox[:, 1::2] = cls_bbox[:, 1::2].clamp(min=0, max=size[1])  # y
+
+            prob = F.softmax(array_tool.totensor(roi_scores), dim=1)
+            bbox, label, score = self._suppress(cls_bbox, prob)
+
+            bboxes.append(bbox)
+            labels.append(label)
+            scores.append(score)
+        self.use_preset('evaluate')
+        self.train()
+        return bboxes, labels, scores
+
+    def get_optimizer(self):
+        lr = opt.lr
+        weight_decay = opt.weight_decay
+        params = []
+        for key, value in dict(self.named_parameters()).items():
+            if value.requires_grad:
+                if 'bias' in key:
+                    params += [{'params': [value], 'lr': lr, 'weight_decay': 0}]
+                else:
+                    params += [{'params': [value], 'lr': lr, 'weight_decay': weight_decay}]
+        if opt.use_adam:
+            self.optimizer = torch.optim.Adam(params)
+        else:
+            self.optimizer = torch.optim.SGD(params, momentum=opt.momentum)
+
+    def scale_lr(self, decay=opt.lr_decay):
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] *= decay
