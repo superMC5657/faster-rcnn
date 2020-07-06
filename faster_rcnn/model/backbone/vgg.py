@@ -2,9 +2,9 @@
 # !@time: 2020/7/4 下午1:46
 # !@author: superMC @email: 18758266469@163.com
 # !@fileName: vgg.py
-from torchvision.models import vgg16, vgg19
+from torchvision.models import vgg16
 from torch import nn
-from faster_rcnn.utils.config import opt
+from experiments.config import opt
 
 layers = {16: vgg16}
 

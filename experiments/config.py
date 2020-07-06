@@ -9,7 +9,7 @@ class Config:
     # data
     voc_data_dir = '/dataset/PASCAL2007/VOC2007/'
     min_size = 600  # image resize
-    max_size = 1000 # image resize
+    max_size = 1000  # image resize
     num_workers = 8
     test_num_workers = 8
 
@@ -23,7 +23,6 @@ class Config:
     lr_decay = 0.1  # 1e-3 -> 1e-4
     lr = 1e-3
 
-
     # visualization
     env = 'faster-rcnn'  # visdom env
     port = 8097
@@ -36,18 +35,17 @@ class Config:
     # training
     epoch = 14
 
-
-    use_adam = False # Use Adam optimizer
-    use_chainer = False # try match everything as chainer
-    use_drop = False # use dropout in RoIHead
+    use_adam = False  # Use Adam optimizer
+    use_chainer = False  # try match everything as chainer
+    use_drop = False  # use dropout in RoIHead
     # debug
     debug_file = '/tmp/debugf'
 
     test_num = 10000
     # model
     load_path = None
-
-    caffe_pretrain = False # use caffe pretrained model instead of torchvision
+    sgd_momentum = 0.9
+    caffe_pretrain = False  # use caffe pretrained model instead of torchvision
     caffe_pretrain_path = 'checkpoints/vgg16_caffe.pth'
 
     def _parse(self, kwargs):

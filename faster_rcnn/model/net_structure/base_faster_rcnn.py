@@ -10,7 +10,7 @@ from faster_rcnn.data.transforms.image_utils import preprocess
 from faster_rcnn.model.utils.bbox_tool import loc2bbox
 from faster_rcnn.utils import array_tool
 from torch.nn import functional as F
-from faster_rcnn.utils.config import opt
+from experiments.config import opt
 
 
 def nograd(func):
@@ -104,8 +104,8 @@ class baseFasterRCNN(nn.Module):
             roi_cls_loc = roi_cls_loc.data
             rois = array_tool.totensor(rois) / scale
 
-            mean = torch.Tensor(self.loc_normalize_mean).cuda().repeat(self.n_class)[None]
-            std = torch.Tensor(self.loc_normalize_std).cuda().repeat(self.n_class)[None]
+            mean = torch.tensor(self.loc_normalize_mean).cuda().repeat(self.n_class)[None]
+            std = torch.tensor(self.loc_normalize_std).cuda().repeat(self.n_class)[None]
 
             roi_cls_loc = roi_cls_loc * std + mean
             roi_cls_loc = roi_cls_loc.view(-1, self.n_class, 4)
@@ -145,8 +145,10 @@ class baseFasterRCNN(nn.Module):
         if opt.use_adam:
             self.optimizer = torch.optim.Adam(params)
         else:
-            self.optimizer = torch.optim.SGD(params, momentum=opt.momentum)
+            self.optimizer = torch.optim.SGD(params, momentum=opt.sgd_momentum)
+        return self.optimizer
 
     def scale_lr(self, decay=opt.lr_decay):
         for param_group in self.optimizer.param_groups:
             param_group['lr'] *= decay
+        return self.optimizer

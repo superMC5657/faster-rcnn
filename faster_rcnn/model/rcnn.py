@@ -9,7 +9,7 @@ from faster_rcnn.model.backbone.vgg import vgg
 from faster_rcnn.model.backbone.resnet import resnet
 from faster_rcnn.model.utils.normalize_tool import normal_init
 from faster_rcnn.utils import array_tool
-from faster_rcnn.model.net_structure._faster_rcnn import baseFasterRCNN
+from faster_rcnn.model.net_structure.base_faster_rcnn import baseFasterRCNN
 from faster_rcnn.model.rpn.region_proposal_network import RegionProposalNetwork
 
 backbone = {'vgg': vgg, 'resnet': resnet}

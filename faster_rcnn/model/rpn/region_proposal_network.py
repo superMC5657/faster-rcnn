@@ -4,19 +4,19 @@ import torch
 from torch.nn import functional as F
 from torch import nn
 
-from ..utils.normalize_tool import normal_init
-from ..utils.bbox_tool import generate_anchor_base
-from ..utils.creator_tool import ProposalCreator
+from faster_rcnn.model.utils.normalize_tool import normal_init
+from faster_rcnn.model.utils.bbox_tool import generate_anchor_base
+from faster_rcnn.model.utils.creator_tool import ProposalCreator
 
 
 class RegionProposalNetwork(nn.Module):
     def __init__(self, in_channels=512, mid_channels=512, ratios=[0.5, 1, 2], anchor_scales=[8, 16, 32], feat_stride=16,
-                 proposal_creator_params=None, ):
+                 proposal_creator_params=None, anchor_base_size=16):
         super(RegionProposalNetwork, self).__init__()
         if proposal_creator_params is None:
             proposal_creator_params = dict()
         self.feat_stride = feat_stride
-        self.anchor_base = generate_anchor_base(anchor_scales=anchor_scales, ratios=ratios)
+        self.anchor_base = generate_anchor_base(base_size=anchor_base_size, anchor_scales=anchor_scales, ratios=ratios)
         self.proposal_layer = ProposalCreator(self, **proposal_creator_params)
 
         n_anchor = self.anchor_base.shape[0]
@@ -50,7 +50,7 @@ class RegionProposalNetwork(nn.Module):
         roi_indices = list()
 
         for i in range(n):
-            roi = self.proposal_layer(rpn_locs[i].cpu().data().numpy(), rpn_fg_scores.cpu().data().numpy(), anchor,
+            roi = self.proposal_layer(rpn_locs[i].cpu().data.numpy(), rpn_fg_scores.cpu().data.numpy(), anchor,
                                       img_size, scale)
             bacth_index = i * np.ones((len(roi),), dtype=np.int32)
             roi.appen(roi)
@@ -71,6 +71,3 @@ def _enumerate_shift_anchor(anchor_base, feat_stride, height, width):
     anchor = anchor_base.reshape((1, A, 4)) + shift.reshape((1, K, 4)).transpose((1, 0, 2))
     anchor = anchor.reshape((K * A, 4)).astype(torch.float32)
     return anchor
-
-
-
