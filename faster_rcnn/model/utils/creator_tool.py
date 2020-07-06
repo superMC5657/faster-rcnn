@@ -11,14 +11,15 @@ from .bbox_tool import bbox2loc, loc2bbox
 
 class ProposalTargetCreator:
 
-    def __init__(self, n_sample=128, pos_ratio=0.25, pos_iou_thresh=0.5, neg_iou_thresh_hi=0.5, neg_iou_thresh_lo=0.0):
+    def __init__(self, n_sample=128, pos_ratio=0.25, pos_iou_thresh=0.5, neg_iou_thresh_hi=0.5, neg_iou_thresh_lo=0.0,
+                 loc_normalize_mean=(0., 0., 0., 0.), loc_normalize_std=(0.1, 0.1, 0.2, 0.2)):
         self.n_sample = n_sample
         self.pos_ratio = pos_ratio
         self.pos_iou_thresh = pos_iou_thresh
         self.neg_iou_thresh_hi = neg_iou_thresh_hi
         self.neg_iou_thresh_lo = neg_iou_thresh_lo
-        self.loc_normalize_mean = (0., 0., 0., 0.)
-        self.loc_normalize_std = (0.1, 0.1, 0.2, 0.2)
+        self.loc_normalize_mean = loc_normalize_mean
+        self.loc_normalize_std = loc_normalize_std
 
     def __call__(self, roi, bbox, label):
         n_bbox, _ = bbox.shape
