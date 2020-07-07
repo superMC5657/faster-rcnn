@@ -48,18 +48,18 @@ class Config:
     caffe_pretrain = False  # use caffe pretrained model instead of torchvision
     caffe_pretrain_path = 'checkpoints/vgg16_caffe.pth'
 
-    def _parse(self, kwargs):
-        state_dict = self._state_dict()
+    def parse(self, kwargs):
+        state_dict = self.state_dict()
         for k, v in kwargs.items():
             if k not in state_dict:
                 raise ValueError('UnKnown Option: "--%s"' % k)
             setattr(self, k, v)
 
         print('======user config========')
-        pprint(self._state_dict())
+        pprint(self.state_dict())
         print('==========end============')
 
-    def _state_dict(self):
+    def state_dict(self):
         return {k: getattr(self, k) for k, _ in Config.__dict__.items() \
                 if not k.startswith('_')}
 

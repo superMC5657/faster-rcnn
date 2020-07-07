@@ -7,7 +7,7 @@ from torchvision.ops import box_iou
 
 def eval_detection_voc(pred_bboxes, pred_labels, pred_scores, gt_bboxes, gt_labels, gt_difficults=None, iou_thresh=0.5,
                        use_07_metric=None):
-    prec, rec = calc_detection_voc_pred_rec(
+    prec, rec = calc_detection_voc_prec_rec(
         pred_bboxes, pred_labels, pred_scores,
         gt_bboxes, gt_labels, gt_difficults,
         iou_thresh=iou_thresh)
@@ -17,7 +17,7 @@ def eval_detection_voc(pred_bboxes, pred_labels, pred_scores, gt_bboxes, gt_labe
     return {'ap': ap, 'map': np.nanmean(ap)}
 
 
-def calc_detection_voc_pred_rec(pred_bboxes, pred_labels, pred_scores, gt_bboxes, gt_labels, gt_difficults=None,
+def calc_detection_voc_prec_rec(pred_bboxes, pred_labels, pred_scores, gt_bboxes, gt_labels, gt_difficults=None,
                                 iou_thresh=0.5):
     pred_bboxes = iter(pred_bboxes)
     pred_labels = iter(pred_labels)

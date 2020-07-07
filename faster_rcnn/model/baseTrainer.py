@@ -123,7 +123,7 @@ class FasterRCNNTrainer(nn.Module):
         save_dict = dict()
 
         save_dict['model'] = self.faster_rcnn.state_dict()
-        save_dict['config'] = opt._state_dict()
+        save_dict['config'] = opt.state_dict()
         save_dict['other_info'] = kwargs
         save_dict['vis_info'] = self.vis.state_dict()
 
@@ -152,7 +152,7 @@ class FasterRCNNTrainer(nn.Module):
             self.faster_rcnn.load_state_dict(state_dict)
             return self
         if parse_opt:
-            opt._parse(state_dict['config'])
+            opt.parse(state_dict['config'])
         if 'optimizer' in state_dict and load_optimizer:
             self.optimizer.load_state_dict(state_dict['optimizer'])
         return self
