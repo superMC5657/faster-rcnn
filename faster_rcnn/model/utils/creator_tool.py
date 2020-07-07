@@ -26,35 +26,37 @@ class ProposalTargetCreator:
     def __call__(self, roi, bbox, label):
         n_bbox, _ = bbox.shape
         roi = torch.cat((roi, bbox), dim=0)  # trick 一定有个bbox 适配 方便之后cls
-        pos_roi_per_image = np.round(self.n_sample * self.pos_ratio)
+        pos_roi_per_image = int(self.n_sample * self.pos_ratio)  # hard negative mining
         iou = box_iou(roi, bbox)
-        gt_assignment = iou.argmax(axis=1)
-        max_iou = iou.max(axis=1)
-        gt_roi_label = label[gt_assignment] + 1
+        gt_assignment = iou.argmax(dim=1)
+        max_iou = iou[gt_assignment]  # keep_dim
+        gt_roi_label = label[gt_assignment] + 1  # 背景为0 所以加1
 
         pos_index = torch.where(max_iou >= self.pos_iou_thresh)[0]
-        pos_roi_per_this_image = int(min(pos_roi_per_image, pos_index.size()))
+        pos_roi_per_this_image = int(min(pos_roi_per_image, pos_index.shape[0]))
 
-        if pos_index.size > 0:
-            pos_index = np.random.choice(pos_index, size=pos_roi_per_this_image, replace=False)
+        if pos_index.shape[0] > pos_roi_per_image:
+            indices = torch.randperm(pos_index.shape[0])[:pos_roi_per_this_image]
+            pos_index = pos_index[indices]
 
-        neg_index = np.where((max_iou < self.neg_iou_thresh_hi) & (max_iou >= self.neg_iou_thresh_lo))[0]
+        neg_index = torch.where((max_iou < self.neg_iou_thresh_hi) & (max_iou >= self.neg_iou_thresh_lo))[0]
 
         neg_roi_per_this_image = self.n_sample - pos_roi_per_this_image
 
-        neg_roi_per_this_image = int(min(neg_roi_per_this_image, neg_index.size))
+        neg_roi_per_this_image = int(min(neg_roi_per_this_image, neg_index.shape[0]))
 
-        if neg_index.size > 0:
-            neg_index = np.random.choice(neg_index, size=neg_roi_per_this_image, replace=False)
+        if neg_index.shape[0] > neg_roi_per_this_image:
+            indices = torch.randperm(neg_index.shape[0])[:neg_roi_per_this_image]
+            neg_index = neg_index[indices]
 
-        keep_index = np.append(pos_index, neg_index)
+        keep_index = torch.cat((pos_index, neg_index), dim=0)
         gt_roi_label = gt_roi_label[keep_index]
         gt_roi_label[pos_roi_per_this_image:] = 0
         sample_roi = roi[keep_index]
 
         gt_roi_loc = bbox2loc(sample_roi, bbox[gt_assignment[keep_index]])
-        gt_roi_loc = ((gt_roi_loc - np.array(self.loc_normalize_mean, np.float32) /
-                       np.array(self.loc_normalize_std, np.float32)))
+        gt_roi_loc = (gt_roi_loc - torch.tensor(self.loc_normalize_mean, dtype=torch.float32)) / torch.tensor(
+            self.loc_normalize_std, dtype=torch.float32)
 
         return sample_roi, gt_roi_loc, gt_roi_label
 
@@ -76,41 +78,39 @@ class AnchorTargetCreator:
         loc = bbox2loc(anchor, bbox[argmax_ious])
         loc = _unmap(loc, n_anchor, inside_index, fill=0)
         label = _unmap(label, n_anchor, inside_index, fill=-1)
-        return loc, label
+        return loc.contiguous(), label.contiguous()
 
     def _creat_label(self, inside_index, anchor, bbox):
-        label = np.empty((len(inside_index),), dtype=np.int32)
-        label.fill(-1)
+        label = torch.zeros(inside_index.shape[0], dtype=torch.int32) - 1
 
         argmax_ious, max_ious, gt_argmax_ious = self._calc_ious(anchor, bbox, inside_index)
 
         label[max_ious < self.neg_iou_thresh] = 0
         label[gt_argmax_ious] = 1
-
         label[max_ious >= self.pos_iou_thresh] = 1
 
         n_pos = int(self.pos_ratio * self.n_sample)
-        pos_index = np.where(label == 1)
+        pos_index = torch.where(label == 1)[0]
 
-        if len(pos_index) > n_pos:
-            disable_index = np.random.choice(pos_index, size=(len(pos_index) - n_pos), replace=False)
+        if pos_index.shape[0] > n_pos:
+            disable_index = torch.randperm(pos_index.shape[0])[:pos_index.shape[0] - n_pos]
             label[disable_index] = -1
-
-        n_neg = self.n_sample - np.sum(label == 1)
-        neg_index = np.where(label == 0)[0]
-        if len(neg_index) > n_neg:
-            disable_index = np.random.choice(neg_index, size=(len(neg_index) - n_neg), replace=False)
+            # label = -1 不参与训练
+        n_neg = self.n_sample - torch.sum(label == 1).item()
+        neg_index = torch.where(label == 0)[0]
+        if neg_index.shape[0] > n_neg:
+            disable_index = torch.randperm(neg_index.shape[0])[:neg_index.shape[0] - n_neg]
             label[disable_index] = -1
         return argmax_ious, label
 
     def _calc_ious(self, anchor, bbox, inside_index):
         ious = box_iou(anchor, bbox)
-        argmax_ious = ious.argmax(axis=1)
-        max_ious = ious[np.arange(len(inside_index)), argmax_ious]
+        argmax_ious = ious.argmax(dim=1)
+        max_ious = ious[torch.arange(inside_index.shape[0]), argmax_ious]
         gt_argmax_ious = ious.argmax(axis=0)
-        gt_max_ious = ious[gt_argmax_ious, np.arange(ious.shape[1])]
+        gt_max_ious = ious[gt_argmax_ious, torch.arange(ious.shape[1])]
 
-        gt_argmax_ious = np.where(ious == gt_max_ious)[0]
+        gt_argmax_ious = torch.where(ious == gt_max_ious)[0]  # [anchor,oneimagelabels] find [oneimagelables] -> []
 
         return argmax_ious, max_ious, gt_argmax_ious
 
@@ -169,16 +169,14 @@ class ProposalCreator:
 
 def _unmap(data, count, index, fill=0):
     if len(data.shape) == 1:
-        ret = np.empty((count,), dtype=data.dtype)
-        ret.fill(fill)
+        ret = torch.zeros((count,), dtype=data.dtype) + fill
         ret[index] = data
     else:
-        ret = np.empty((count,) + data.shape[1:], dtype=data.dtype)
-        ret.fill(fill)
+        ret = torch.zeros((count,) + data.shape[1:], dtype=data.dtype) + fill
         ret[index, :] = data
     return ret
 
 
 def _get_inside_index(anchor, H, W):
-    inside_index = np.where((anchor[:, 0] >= 0) & (anchor[:, 1] >= 0) & (anchor[:, 2] <= H) & (anchor[:, 3] <= W))[0]
+    inside_index = torch.where((anchor[:, 0] >= 0) & (anchor[:, 1] >= 0) & (anchor[:, 2] <= H) & (anchor[:, 3] <= W))[0]
     return inside_index

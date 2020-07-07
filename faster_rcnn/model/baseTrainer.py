@@ -65,37 +65,35 @@ class FasterRCNNTrainer(nn.Module):
         roi = rois[0]
         sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creator(roi, bbox,
                                                                             label)
-        sample_roi_index = torch.zeros(len(sample_roi))
 
-        roi_cls_loc, roi_label = self.rcnn.head(features, sample_roi, sample_roi_index)
-        gt_rpn_loc, gt_rpn_label = self.anchor_target_creator(array_tool.tonumpy(bbox), anchor, img_size)
+        roi_cls_loc, roi_label = self.rcnn.head(features, sample_roi)
+        gt_rpn_loc, gt_rpn_label = self.anchor_target_creator(bbox, anchor, img_size)
 
-        gt_rpn_label = array_tool.totensor(gt_rpn_label).long()
-        gt_rpn_loc = array_tool.totensor(gt_rpn_loc)
+        gt_rpn_label = gt_rpn_label.long()
+        gt_roi_label = gt_roi_label.long()
+        rpn_loc_loss = self._rcnn_loc_loss(rpn_loc, gt_rpn_loc, gt_rpn_label, self.rpn_sigma)
+        rpn_cls_loss = F.cross_entropy(rpn_score, gt_rpn_label, ignore_index=-1)
 
-        rpn_loc_loss = self._rcnn_loc_loss(rpn_loc.contiguous(), gt_rpn_loc, gt_rpn_label.data, self.rpn_sigma)
-        rpn_cls_loss = F.cross_entropy(rpn_score, gt_rpn_label.to(opt.device), ignore_index=-1)
         _gt_rpn_label = gt_rpn_label[gt_rpn_label > -1]
-        _rpn_score = array_tool.tonumpy(rpn_score)[array_tool.tonumpy(gt_rpn_label) > -1]
-        self.rpn_cm.add(array_tool.totensor(_rpn_score, False), _gt_rpn_label.data.long())
+        _rpn_score = rpn_score[gt_rpn_label > -1]
+        self.rpn_cm.add(_rpn_score.detach(), _gt_rpn_label.detach())
 
         n_sample = roi_cls_loc.shape[0]
         roi_cls_loc = roi_cls_loc.view(n_sample, -1, 4)
-        roi_loc = roi_cls_loc[torch.arange(0, n_sample).long().to(opt.device), array_tool.totensor(gt_roi_label).long()]
-        gt_roi_label = array_tool.totensor(gt_roi_label).long()
-        gt_roi_loc = array_tool.totensor(gt_roi_loc)
-        roi_loc_loss = self._rcnn_loc_loss(roi_loc.contiguous(), gt_roi_loc, gt_roi_label.data, self.roi_sigma)
-        roi_cls_loss = self.CrossEntropyLoss(roi_label, gt_roi_label.cuda())
+        roi_loc = roi_cls_loc[torch.arange(0, n_sample).long().to(opt.device), gt_roi_label]
+
+        roi_loc_loss = self._rcnn_loc_loss(roi_loc, gt_roi_loc, gt_roi_label, self.roi_sigma)
+        roi_cls_loss = F.cross_entropy(roi_label, gt_roi_label)
 
         losses = [rpn_loc_loss, rpn_cls_loss, roi_loc_loss, roi_cls_loss]
         losses = losses + [sum(losses)]
 
         return LossTuple(*losses)
 
-    def _rcnn_loc_loss(pred_loc, gt_loc, gt_label, sigma):
+    def _rcnn_loc_loss(self, pred_loc, gt_loc, gt_label, sigma):
         in_weight = torch.zeros(gt_loc.shape).to(opt.device)
         in_weight[(gt_label > 0).view(-1, 1).expand_as(in_weight).to(opt.device)] = 1
-        loc_loss = _smooth_l1_loss(pred_loc, gt_loc, in_weight.detach(), sigma)
+        loc_loss = _smooth_l1_loss(pred_loc, gt_loc, in_weight, sigma)
         loc_loss /= (gt_label >= 0).sum().float()
         return loc_loss
 

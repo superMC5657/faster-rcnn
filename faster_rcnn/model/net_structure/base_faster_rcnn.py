@@ -115,7 +115,7 @@ class baseFasterRCNN(nn.Module):
             cls_bbox = loc2bbox(rois.reshape((-1, 4)),
                                 roi_cls_loc.reshape((-1, 4)))
 
-            cls_bbox = array_tool.totensor(cls_bbox)
+            cls_bbox = cls_bbox.to(opt.device)
             cls_bbox = cls_bbox.view(-1, self.n_class * 4)
 
             # clip bbox

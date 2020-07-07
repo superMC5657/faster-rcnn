@@ -7,6 +7,7 @@ from six import moves
 import torch
 import numpy as np
 
+
 #  loc 可能为bbox的偏移
 def loc2bbox(src_bbox, loc):
     if src_bbox.shape[0] == 0:
@@ -56,6 +57,8 @@ def bbox2loc(src_bbox, dst_bbox):
 
     loc = torch.stack((dy, dx, dh, dw), dim=1)
     return loc
+
+
 
 
 def generate_anchor_base(base_size=16, ratios=[0.5, 1, 2],

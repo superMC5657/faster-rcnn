@@ -5,12 +5,12 @@
 import torch
 from torch import nn
 from torchvision.ops.roi_pool import RoIPool
-from faster_rcnn.model.backbone.vgg import vgg
+
 from faster_rcnn.model.backbone.resnet import resnet
-from faster_rcnn.model.utils.normalize_tool import normal_init
-from faster_rcnn.utils import array_tool
+from faster_rcnn.model.backbone.vgg import vgg
 from faster_rcnn.model.net_structure.base_faster_rcnn import baseFasterRCNN
 from faster_rcnn.model.rpn.region_proposal_network import RegionProposalNetwork
+from faster_rcnn.model.utils.normalize_tool import normal_init
 
 backbone = {'vgg': vgg, 'resnet': resnet}
 
@@ -45,16 +45,15 @@ class RoIHead(nn.Module):
 
         self.roi = RoIPool((self.roi_size, self.roi_size), self.spatial_scale)
 
-    def forward(self, x, rois, roi_indices):
-        roi_indices = array_tool.totensor(roi_indices).float()
-        rois = array_tool.totensor(rois).float()
+    def forward(self, x, rois):
+        roi_indices = torch.zeros(len(rois))
 
-        indices_and_rois = torch.cat([roi_indices[:None], rois], dim=1)
+        indices_and_rois = torch.cat([roi_indices[:, None], rois], dim=1)
 
         # yx->xy
-        xy_indices_and_rois = indices_and_rois[:, [0, 2, 1, 4, 3]]
+        indices_and_rois = indices_and_rois[:, [0, 2, 1, 4, 3]].contiguous()
         pool = self.roi(x, indices_and_rois)
-        pool = pool.view(pool.size(0), -1)
+        pool = pool.view(pool.size(0), -1).contiguous()
         fc7 = self.classifier(pool)
         roi_cls_locs = self.cls_loc(fc7)
         roi_scores = self.score(fc7)
