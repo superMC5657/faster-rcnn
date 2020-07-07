@@ -40,9 +40,10 @@ class baseFasterRCNN(nn.Module):
     def forward(self, x, scale=1.):
         image_size = x.shape[2:]
         h = self.extractor(x)
-        rpn_locs, rpn_scores, rois, roi_indices, anchor = self.rpn(h, image_size, scale)
-        roi_cls_locs, roi_scores = self.head(h, rois, roi_indices)
-        return roi_cls_locs, roi_scores, rois, roi_indices
+        rpn_locs, rpn_scores, rois, anchor = self.rpn(h, image_size, scale)
+        roi = rois[0]
+        roi_cls_locs, roi_scores = self.head(h, roi)
+        return roi_cls_locs, roi_scores, rois
 
     def use_preset(self, preset):
         if preset == 'visualize':
@@ -99,7 +100,7 @@ class baseFasterRCNN(nn.Module):
         for img, size in zip(prepared_imgs, sizes):
             img = array_tool.totensor(img[None]).float()
             scale = img.shape[3] / size[1]
-            roi_cls_loc, roi_scores, rois, _ = self.forward(img, scale)
+            roi_cls_loc, roi_scores, rois = self.forward(img, scale)
             roi_scores = roi_scores.data
             roi_cls_loc = roi_cls_loc.data
             rois = array_tool.totensor(rois) / scale

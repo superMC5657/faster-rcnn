@@ -36,7 +36,7 @@ class RegionProposalNetwork(nn.Module):
 
         features = F.relu(self.conv1(x))
         rpn_locs = self.loc(features)
-        rpn_locs = rpn_locs.permute(0, 2, 3, 1).contiguous().view(n, -1, 4)
+        rpn_locs = rpn_locs.permute(0, 2, 3, 1).contiguous().reshape(n, -1, 4)
 
         rpn_scores = self.score(features)
         rpn_scores = rpn_scores.permute(0, 2, 3, 1).contiguous()
@@ -47,17 +47,17 @@ class RegionProposalNetwork(nn.Module):
         rpn_scores = rpn_scores.view(n, -1, 2)
 
         rois = list()
-        roi_indices = list()
+
         for i in range(n):
-            roi = self.proposal_layer(rpn_locs[i], rpn_fg_scores[i], anchor,
+            # 需要分离 roi不需要梯度下降
+            roi = self.proposal_layer(rpn_locs[i].detach(), rpn_fg_scores[i].detach(), anchor,
                                       img_size, scale)
 
-            bacth_index = i * torch.ones((len(roi),), dtype=torch.int32)
             rois.append(roi)
-            roi_indices.append(bacth_index)
+
         rois = torch.stack(rois, dim=0)
-        roi_indices = torch.stack(roi_indices, dim=0)
-        return rpn_locs, rpn_scores, rois, roi_indices, anchor
+
+        return rpn_locs, rpn_scores, rois, anchor
 
 
 def _enumerate_shift_anchor(anchor_base, feat_stride, height, width):

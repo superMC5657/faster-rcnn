@@ -16,7 +16,7 @@ class Config:
     num_workers = 8
     test_num_workers = 8
 
-    device = torch.device("cpu")
+    device = torch.device("cuda:0")
 
     # sigma for l1_smooth_loss
     rpn_sigma = 3.

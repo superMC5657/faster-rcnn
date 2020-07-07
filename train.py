@@ -6,6 +6,7 @@
 import os
 import ipdb
 import matplotlib
+import torch
 from tqdm import tqdm
 
 from experiments.config import opt
@@ -60,7 +61,7 @@ def train(**kwargs):
     rcnn = FasterRCNN(opt.pretrained_model)
     print('construct completed')
 
-    trainer = FasterRCNNTrainer(rcnn).to(opt.device)
+    trainer = FasterRCNNTrainer(rcnn).to(opt.device).train()
     if opt.load_path:
         trainer.load(opt.load_path)
     trainer.vis.log(dataset.db.label_names, win='labels')
@@ -73,19 +74,20 @@ def train(**kwargs):
             imgs = imgs.to(opt.device).float()
             gt_bboxes = gt_bboxes.to(opt.device)
             gt_labels = gt_labels.to(opt.device)
+            with torch.autograd.set_detect_anomaly(True):
+                trainer.train_step(imgs, gt_bboxes, gt_labels, scales)
 
-            trainer.train_step(imgs, gt_bboxes, gt_labels, scales)
             if (index + 1) % opt.plot_every == 0:
                 if os.path.exists(opt.debug_file):
                     ipdb.set_trace()
-                trainer.vis_plot_many(trainer.get_meter_data())
+                trainer.vis.plot_many(trainer.get_meter_data())
                 ori_img_ = inverse_normalize(array_tool.tonumpy(imgs[0]))
                 gt_img = visdom_bbox(ori_img_, array_tool.tonumpy(gt_bboxes[0]), array_tool.tonumpy(gt_labels[0]))
                 trainer.vis.img('gt_img', gt_img)
 
                 pred_bboxes, pred_labels, pred_scores = trainer.rcnn.predict([ori_img_], visualize=True)
                 pred_img = visdom_bbox(ori_img_, array_tool.tonumpy(pred_bboxes[0]),
-                                       array_tool.tonumpy(pred_labels).reshape(-1), array_tool.tonumpy(pred_scores[0]))
+                                       array_tool.tonumpy(pred_labels[0]).reshape(-1), array_tool.tonumpy(pred_scores[0]))
 
                 trainer.vis.img('pred_img', pred_img)
 

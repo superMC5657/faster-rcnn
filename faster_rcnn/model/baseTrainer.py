@@ -56,13 +56,14 @@ class FasterRCNNTrainer(nn.Module):
         img_size = list(imgs.shape)[2:4]
 
         features = self.rcnn.extractor(imgs)
-        rpn_locs, rpn_scores, rois, roi_indices, anchor = self.rcnn.rpn(features, img_size, scale)
+        rpn_locs, rpn_scores, rois, anchor = self.rcnn.rpn(features, img_size, scale)
 
         bbox = bboxes[0]
         label = labels[0]
         rpn_score = rpn_scores[0]
         rpn_loc = rpn_locs[0]
         roi = rois[0]
+
         sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creator(roi, bbox,
                                                                             label)
 

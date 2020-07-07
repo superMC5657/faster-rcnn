@@ -6,6 +6,7 @@ import torch
 from torch import nn
 from torchvision.ops.roi_pool import RoIPool
 
+from experiments.config import opt
 from faster_rcnn.model.backbone.resnet import resnet
 from faster_rcnn.model.backbone.vgg import vgg
 from faster_rcnn.model.net_structure.base_faster_rcnn import baseFasterRCNN
@@ -46,9 +47,9 @@ class RoIHead(nn.Module):
         self.roi = RoIPool((self.roi_size, self.roi_size), self.spatial_scale)
 
     def forward(self, x, rois):
-        roi_indices = torch.zeros(len(rois))
+        roi_indices = torch.zeros(rois.shape[0]).to(opt.device)
 
-        indices_and_rois = torch.cat([roi_indices[:, None], rois], dim=1)
+        indices_and_rois = torch.cat((roi_indices[:, None], rois), dim=1)
 
         # yx->xy
         indices_and_rois = indices_and_rois[:, [0, 2, 1, 4, 3]].contiguous()

@@ -55,8 +55,8 @@ class ProposalTargetCreator:
         sample_roi = roi[keep_index]
 
         gt_roi_loc = bbox2loc(sample_roi, bbox[gt_assignment[keep_index]])
-        gt_roi_loc = (gt_roi_loc - torch.tensor(self.loc_normalize_mean, dtype=torch.float32)) / torch.tensor(
-            self.loc_normalize_std, dtype=torch.float32)
+        gt_roi_loc = (gt_roi_loc - torch.tensor(self.loc_normalize_mean, dtype=torch.float32).to(
+            opt.device)) / torch.tensor(self.loc_normalize_std, dtype=torch.float32).to(opt.device)
 
         return sample_roi, gt_roi_loc, gt_roi_label
 
@@ -72,7 +72,7 @@ class AnchorTargetCreator:
         img_H, img_W = img_size
         n_anchor = len(anchor)
         inside_index = _get_inside_index(anchor, img_H, img_W)
-        anchor = anchor[inside_index]
+        anchor = anchor[inside_index].to(opt.device)
         argmax_ious, label = self._creat_label(inside_index, anchor, bbox)
 
         loc = bbox2loc(anchor, bbox[argmax_ious])
@@ -169,11 +169,11 @@ class ProposalCreator:
 
 def _unmap(data, count, index, fill=0):
     if len(data.shape) == 1:
-        ret = torch.zeros((count,), dtype=data.dtype) + fill
-        ret[index] = data
+        ret = torch.zeros((count,), dtype=data.dtype).to(opt.device) + fill
+        ret[index] = data.to(opt.device)
     else:
-        ret = torch.zeros((count,) + data.shape[1:], dtype=data.dtype) + fill
-        ret[index, :] = data
+        ret = torch.zeros((count,) + data.shape[1:], dtype=data.dtype).to(opt.device) + fill
+        ret[index, :] = data.to(opt.device)
     return ret
 
 

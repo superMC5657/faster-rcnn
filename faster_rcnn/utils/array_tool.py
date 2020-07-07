@@ -5,6 +5,7 @@ import torch as torch
 import numpy as np
 from experiments.config import opt
 
+
 def tonumpy(data):
     if isinstance(data, np.ndarray):
         return data

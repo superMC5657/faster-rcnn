@@ -7,13 +7,15 @@ from six import moves
 import torch
 import numpy as np
 
-
 #  loc 可能为bbox的偏移
+from experiments.config import opt
+
+
 def loc2bbox(src_bbox, loc):
     if src_bbox.shape[0] == 0:
         return torch.zeros((0, 4), dtype=loc.dtype)
 
-    src_bbox = src_bbox.type(src_bbox.dtype)
+    src_bbox = src_bbox.type(src_bbox.dtype).to(opt.device)
 
     src_height = src_bbox[:, 2] - src_bbox[:, 0]
     src_width = src_bbox[:, 3] - src_bbox[:, 1]
@@ -30,7 +32,7 @@ def loc2bbox(src_bbox, loc):
     h = torch.exp(dh) * src_height[:, None]
     w = torch.exp(dw) * src_width[:, None]
 
-    dst_bbox = torch.zeros(loc.shape, dtype=loc.dtype)
+    dst_bbox = torch.zeros(loc.shape, dtype=loc.dtype).to(opt.device)
     dst_bbox[:, 0::4] = ctr_y - 0.5 * h
     dst_bbox[:, 1::4] = ctr_x - 0.5 * w
     dst_bbox[:, 2::4] = ctr_y + 0.5 * h
@@ -57,8 +59,6 @@ def bbox2loc(src_bbox, dst_bbox):
 
     loc = torch.stack((dy, dx, dh, dw), dim=1)
     return loc
-
-
 
 
 def generate_anchor_base(base_size=16, ratios=[0.5, 1, 2],
