@@ -104,16 +104,16 @@ class baseFasterRCNN(nn.Module):
             roi_cls_loc = roi_cls_loc.data
             rois = array_tool.totensor(rois) / scale
 
-            mean = torch.tensor(self.loc_normalize_mean).cuda().repeat(self.n_class)[None]
-            std = torch.tensor(self.loc_normalize_std).cuda().repeat(self.n_class)[None]
+            mean = torch.tensor(self.loc_normalize_mean).to(opt.device).repeat(self.n_class)[None]
+            std = torch.tensor(self.loc_normalize_std).to(opt.device).repeat(self.n_class)[None]
 
             roi_cls_loc = roi_cls_loc * std + mean
             roi_cls_loc = roi_cls_loc.view(-1, self.n_class, 4)
 
             rois = rois.view(-1, 1, 4).expand_as(roi_cls_loc)
 
-            cls_bbox = loc2bbox(array_tool.tonumpy(rois).reshape((-1, 4)),
-                                array_tool.tonumpy(roi_cls_loc).reshape((-1, 4)))
+            cls_bbox = loc2bbox(rois.reshape((-1, 4)),
+                                roi_cls_loc.reshape((-1, 4)))
 
             cls_bbox = array_tool.totensor(cls_bbox)
             cls_bbox = cls_bbox.view(-1, self.n_class * 4)

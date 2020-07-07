@@ -3,7 +3,7 @@ tools to convert specified type
 """
 import torch as torch
 import numpy as np
-
+from experiments.config import opt
 
 def tonumpy(data):
     if isinstance(data, np.ndarray):
@@ -18,7 +18,7 @@ def totensor(data, cuda=True):
     if isinstance(data, torch.Tensor):
         data = data.detach()
     if cuda:
-        data = data.cuda()
+        data = data.to(opt.device)
     return data
 
 

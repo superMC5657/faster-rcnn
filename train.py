@@ -60,7 +60,7 @@ def train(**kwargs):
     rcnn = FasterRCNN(opt.pretrained_model)
     print('construct completed')
 
-    trainer = FasterRCNNTrainer(rcnn).cuda()
+    trainer = FasterRCNNTrainer(rcnn).to(opt.device)
     if opt.load_path:
         trainer.load(opt.load_path)
     trainer.vis.log(dataset.db.label_names, win='labels')
@@ -68,18 +68,18 @@ def train(**kwargs):
 
     for epoch in range(opt.epoch):
         trainer.reset_meters()
-        for index, (imgs_, gt_bboxes, gt_labels, scales) in tqdm(enumerate(dataloader)):
+        for index, (imgs, gt_bboxes, gt_labels, scales) in tqdm(enumerate(dataloader)):
             scales = array_tool.scalar(scales)
-            imgs_ = imgs_.cuda().float()
-            gt_bboxes = gt_bboxes.cuda()
-            gt_labels = gt_labels.cuda()
+            imgs = imgs.to(opt.device).float()
+            gt_bboxes = gt_bboxes.to(opt.device)
+            gt_labels = gt_labels.to(opt.device)
 
-            trainer.train_step(imgs_, gt_bboxes, gt_labels, scales)
+            trainer.train_step(imgs, gt_bboxes, gt_labels, scales)
             if (index + 1) % opt.plot_every == 0:
                 if os.path.exists(opt.debug_file):
                     ipdb.set_trace()
                 trainer.vis_plot_many(trainer.get_meter_data())
-                ori_img_ = inverse_normalize(array_tool.tonumpy(imgs_[0]))
+                ori_img_ = inverse_normalize(array_tool.tonumpy(imgs[0]))
                 gt_img = visdom_bbox(ori_img_, array_tool.tonumpy(gt_bboxes[0]), array_tool.tonumpy(gt_labels[0]))
                 trainer.vis.img('gt_img', gt_img)
 
@@ -110,6 +110,4 @@ def train(**kwargs):
 
 
 if __name__ == '__main__':
-    import fire
-
-    fire.Fire(train)
+    train()

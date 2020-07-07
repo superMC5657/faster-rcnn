@@ -6,6 +6,8 @@
 import numpy as np
 import torch
 from torchvision.ops import nms, box_iou
+
+from experiments.config import opt
 from .bbox_tool import bbox2loc, loc2bbox
 
 
@@ -23,15 +25,15 @@ class ProposalTargetCreator:
 
     def __call__(self, roi, bbox, label):
         n_bbox, _ = bbox.shape
-        roi = np.concatenate((roi, bbox), axis=0)
+        roi = torch.cat((roi, bbox), dim=0)  # trick 一定有个bbox 适配 方便之后cls
         pos_roi_per_image = np.round(self.n_sample * self.pos_ratio)
         iou = box_iou(roi, bbox)
         gt_assignment = iou.argmax(axis=1)
         max_iou = iou.max(axis=1)
         gt_roi_label = label[gt_assignment] + 1
 
-        pos_index = np.where(max_iou >= self.pos_iou_thresh)[0]
-        pos_roi_per_this_image = int(min(pos_roi_per_image, pos_index.size))
+        pos_index = torch.where(max_iou >= self.pos_iou_thresh)[0]
+        pos_roi_per_this_image = int(min(pos_roi_per_image, pos_index.size()))
 
         if pos_index.size > 0:
             pos_index = np.random.choice(pos_index, size=pos_roi_per_this_image, replace=False)
@@ -115,7 +117,7 @@ class AnchorTargetCreator:
 
 class ProposalCreator:
     def __init__(self, parent_model, nms_thresh=0.7, n_train_pre_nms=12000, n_train_post_nms=2000, n_test_pre_nms=6000,
-                 n_test_post_nms=300, min_size=300):
+                 n_test_post_nms=300, min_size=16):
         self.min_size = min_size
         self.n_test_post_nms = n_test_post_nms
         self.n_test_pre_nms = n_test_pre_nms
@@ -134,29 +136,34 @@ class ProposalCreator:
         # roi  dst_bbox
         roi = loc2bbox(anchor, loc)
 
-        roi[:, slice(0, 4, 2)] = np.clip(roi[:, slice(0, 4, 2)], 0, img_size[0])
-        roi[: slice(1, 4, 2)] = np.clip(roi[:, slice(1, 4, 2)], 0, img_size[1])
+        roi[:, 0] = torch.clamp(roi[:, 0], 0, img_size[0])
+        roi[:, 2] = torch.clamp(roi[:, 2], 0, img_size[0])
+        roi[:, 1] = torch.clamp(roi[:, 1], 0, img_size[1])
+        roi[:, 3] = torch.clamp(roi[:, 3], 0, img_size[1])
 
         min_size = self.min_size * scale
         hs = roi[:, 2] - roi[:, 0]
         ws = roi[:, 3] - roi[:, 1]
+
         # 过滤出界的
-        keep = np.where((hs >= min_size) & (ws >= min_size))[0]
+        keep = torch.where((hs >= min_size) & (ws >= min_size))[0]
+
         roi = roi[keep, :]
+
         score = score[keep]
         # 过滤,只选取score高的
-        order = score.ravel().argsort()[::-1]
+        order = score.argsort(descending=True)
         if n_pre_nms > 0:
             order = order[:n_pre_nms]
+        roi = roi[order, :]
 
-        roi = roi[order:]
-        score = score[order:]
+        score = score[order]
 
-        keep = nms(torch.from_numpy(roi).cuda(), torch.from_numpy(score).cuda(), self.nms_thresh)
+        keep = nms(roi, score, self.nms_thresh)
         # 最后输出的时候 最大只选取n_post_nms
         if n_post_nms > 0:
             keep = keep[:n_post_nms]
-        roi = roi[keep.cpu().numpy()]
+        roi = roi[keep]
         return roi
 
 

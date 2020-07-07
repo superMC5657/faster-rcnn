@@ -1,17 +1,22 @@
 from pprint import pprint
 
-
 # Default Configs for training
 # NOTE that, config items could be overwriten by passing argument through command line.
 # e.g. --voc-data-dir='./data/'
+import torch
+
 
 class Config:
     # data
-    voc_data_dir = '/dataset/PASCAL2007/VOC2007/'
+    train_voc_data_dir = '/home/supermc/Datasets/VOCdevkit/VOC2012'
+    test_voc_data_dir = '/home/supermc/Datasets/VOCdevkit/VOC2007'
     min_size = 600  # image resize
     max_size = 1000  # image resize
+    batch_size = 1
     num_workers = 8
     test_num_workers = 8
+
+    device = torch.device("cpu")
 
     # sigma for l1_smooth_loss
     rpn_sigma = 3.
@@ -24,13 +29,13 @@ class Config:
     lr = 1e-3
 
     # visualization
-    env = 'faster-rcnn'  # visdom env
+    env = 'default'  # visdom env
     port = 8097
     plot_every = 40  # vis every N iter
 
     # preset
     data = 'voc'
-    pretrained_model = 'vgg16'
+    pretrained_model = 'vgg-16'
 
     # training
     epoch = 14
