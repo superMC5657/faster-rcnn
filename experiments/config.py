@@ -8,15 +8,15 @@ import torch
 
 class Config:
     # data
-    train_voc_data_dir = '/home/supermc/Datasets/VOCdevkit/VOC2012'
-    test_voc_data_dir = '/home/supermc/Datasets/VOCdevkit/VOC2007'
+    train_voc_data_dir = '/home1/datasets/VOCdevkit/VOC2012'
+    test_voc_data_dir = '/home1/datasets/VOCdevkit/VOC2007'
     min_size = 600  # image resize
     max_size = 1000  # image resize
     batch_size = 1
     num_workers = 8
     test_num_workers = 8
 
-    device = torch.device("cuda:0")
+    device = torch.device("cuda:1")
 
     # sigma for l1_smooth_loss
     rpn_sigma = 3.
@@ -29,7 +29,8 @@ class Config:
     lr = 1e-3
 
     # visualization
-    env = 'default'  # visdom env
+    env = 'faster_rcnn'  # visdom env
+    url = '10.20.216.3'
     port = 8097
     plot_every = 40  # vis every N iter
 

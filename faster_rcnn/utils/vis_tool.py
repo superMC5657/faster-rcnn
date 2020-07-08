@@ -5,6 +5,8 @@ import matplotlib
 import torch as t
 import visdom
 
+from experiments.config import opt
+
 matplotlib.use('Agg')
 from matplotlib import pyplot as plot
 
@@ -175,7 +177,7 @@ class Visualizer(object):
     """
 
     def __init__(self, env='default', **kwargs):
-        self.vis = visdom.Visdom('127.0.0.1', env=env, use_incoming_socket=False, **kwargs)
+        self.vis = visdom.Visdom(opt.url, port=opt.port, env=env, use_incoming_socket=False, **kwargs)
         self._vis_kw = kwargs
 
         # e.g.('loss',23) the 23th value of loss

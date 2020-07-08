@@ -24,8 +24,8 @@ def _smooth_l1_loss(pred_loc, gt_loc, in_weight, sigma):
     sigma2 = sigma ** 2
     diff = in_weight * (pred_loc - gt_loc)
     abs_diff = diff.abs()
-    flag = (abs_diff.data < 1. / sigma2).float()
-    y = (flag * (sigma2 / 2.) * (diff * 2) + (1 - flag) * (abs_diff - 0.5 / sigma2))
+    flag = (abs_diff.data < (1. / sigma2)).float()
+    y = (flag * (sigma2 / 2.) * (diff ** 2) + (1 - flag) * (abs_diff - 0.5 / sigma2))
     return y.sum()
 
 
@@ -72,7 +72,7 @@ class FasterRCNNTrainer(nn.Module):
 
         gt_rpn_label = gt_rpn_label.long()
         gt_roi_label = gt_roi_label.long()
-        rpn_loc_loss = self._rcnn_loc_loss(rpn_loc, gt_rpn_loc, gt_rpn_label, self.rpn_sigma)
+        rpn_loc_loss = self._rcnn_loc_loss(rpn_loc, gt_rpn_loc, gt_rpn_label.data, self.rpn_sigma)
         rpn_cls_loss = F.cross_entropy(rpn_score, gt_rpn_label, ignore_index=-1)
 
         _gt_rpn_label = gt_rpn_label[gt_rpn_label > -1]
@@ -94,8 +94,8 @@ class FasterRCNNTrainer(nn.Module):
     def _rcnn_loc_loss(self, pred_loc, gt_loc, gt_label, sigma):
         in_weight = torch.zeros(gt_loc.shape).to(opt.device)
         in_weight[(gt_label > 0).view(-1, 1).expand_as(in_weight).to(opt.device)] = 1
-        loc_loss = _smooth_l1_loss(pred_loc, gt_loc, in_weight, sigma)
-        loc_loss /= (gt_label >= 0).sum().float()
+        loc_loss = _smooth_l1_loss(pred_loc, gt_loc, in_weight.detach(), sigma)
+        loc_loss /= ((gt_label >= 0).sum().float())
         return loc_loss
 
     def train_step(self, imgs, bboxes, labels, scale):

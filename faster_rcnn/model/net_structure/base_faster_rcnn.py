@@ -37,14 +37,6 @@ class baseFasterRCNN(nn.Module):
     def n_class(self):
         return self.head.n_class
 
-    def forward(self, x, scale=1.):
-        image_size = x.shape[2:]
-        h = self.extractor(x)
-        rpn_locs, rpn_scores, rois, anchor = self.rpn(h, image_size, scale)
-        roi = rois[0]
-        roi_cls_locs, roi_scores = self.head(h, roi)
-        return roi_cls_locs, roi_scores, rois
-
     def use_preset(self, preset):
         if preset == 'visualize':
             self.nms_thresh = 0.3
@@ -76,6 +68,14 @@ class baseFasterRCNN(nn.Module):
         label = np.concatenate(label, axis=0).astype(np.int32)
         score = np.concatenate(score, axis=0).astype(np.float32)
         return bbox, label, score
+
+    def forward(self, x, scale=1.):
+        image_size = x.shape[2:]
+        h = self.extractor(x)
+        rpn_locs, rpn_scores, rois, anchor = self.rpn(h, image_size, scale)
+        rois = rois[0]
+        roi_cls_locs, roi_scores = self.head(h, rois)
+        return roi_cls_locs, roi_scores, rois
 
     # maybe batch inference
     @torch.no_grad()
