@@ -119,7 +119,7 @@ class FasterRCNNTrainer(nn.Module):
         """
         save_dict = dict()
 
-        save_dict['model'] = self.faster_rcnn.state_dict()
+        save_dict['model'] = self.rcnn.state_dict()
         save_dict['config'] = opt.state_dict()
         save_dict['other_info'] = kwargs
         save_dict['vis_info'] = self.vis.state_dict()

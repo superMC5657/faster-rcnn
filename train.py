@@ -31,7 +31,7 @@ matplotlib.use('agg')
 def eval(dataloader, rcnn, test_num=10000):
     pred_bboxes, pred_labels, pred_scores = list(), list(), list()
     gt_bboxes, gt_labels, gt_difficults = list(), list(), list()
-    for index, (imgs_, sizes_, gt_bboxes_, gt_labels_, gt_difficult_) in tqdm(enumerate(dataloader)):
+    for index, (imgs_, sizes_, gt_bboxes_, gt_labels_, gt_difficult_) in enumerate(tqdm(dataloader)):
         sizes_ = [sizes_[0][0].item(), sizes_[1][0].item()]
         pred_bboxes_, pred_labels_, pred_scores_ = rcnn.predict(imgs_, [sizes_])
         gt_bboxes += list(gt_bboxes_.numpy())
@@ -69,7 +69,7 @@ def train(**kwargs):
 
     for epoch in range(opt.epoch):
         trainer.reset_meters()
-        for index, (imgs, gt_bboxes, gt_labels, scales) in tqdm(enumerate(dataloader)):
+        for index, (imgs, gt_bboxes, gt_labels, scales) in enumerate(tqdm(dataloader)):
             scales = array_tool.scalar(scales)
             imgs = imgs.to(opt.device).float()
             gt_bboxes = gt_bboxes.to(opt.device)
@@ -87,7 +87,8 @@ def train(**kwargs):
 
                 pred_bboxes, pred_labels, pred_scores = trainer.rcnn.predict([ori_img_], visualize=True)
                 pred_img = visdom_bbox(ori_img_, array_tool.tonumpy(pred_bboxes[0]),
-                                       array_tool.tonumpy(pred_labels[0]).reshape(-1), array_tool.tonumpy(pred_scores[0]))
+                                       array_tool.tonumpy(pred_labels[0]).reshape(-1),
+                                       array_tool.tonumpy(pred_scores[0]))
 
                 trainer.vis.img('pred_img', pred_img)
 
@@ -97,11 +98,10 @@ def train(**kwargs):
         eval_result = eval(test_dataloader, rcnn, test_num=opt.test_num)
         trainer.vis.plot('test_map', eval_result['map'])
         lr_ = trainer.rcnn.optimizer.param_groups[0]['lr']
-        log_info = 'lr:{},map:{},loss:{}'.format(str(lr_), str(eval_result['map'], str(trainer.get_meter_data())))
-
+        log_info = 'lr:{}\n map:{}\nloss:{}'.format(str(lr_), str(eval_result['map']), str(trainer.get_meter_data()))
         trainer.vis.log(log_info)
 
-        if eval_result['map'] > best_map:
+        if eval_result['map'] >= best_map:
             best_map = eval_result['map']
             best_path = trainer.save(best_map=best_map)
         if epoch == 9:

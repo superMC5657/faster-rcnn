@@ -4,6 +4,8 @@ import numpy as np
 from six import moves
 from torchvision.ops import box_iou
 
+from faster_rcnn.model.utils.bbox_tool import bbox_iou
+
 
 def eval_detection_voc(pred_bboxes, pred_labels, pred_scores, gt_bboxes, gt_labels, gt_difficults=None, iou_thresh=0.5,
                        use_07_metric=None):
@@ -52,7 +54,7 @@ def calc_detection_voc_prec_rec(pred_bboxes, pred_labels, pred_scores, gt_bboxes
             gt_difficult_l = gt_difficult[gt_mask_l]
 
             n_pos[l] += np.logical_not(gt_difficult_l).sum()
-            score[l] += pred_score_l
+            score[l].extend(pred_score_l)
 
             if len(pred_bbox_l) == 0:
                 continue
@@ -65,7 +67,7 @@ def calc_detection_voc_prec_rec(pred_bboxes, pred_labels, pred_scores, gt_bboxes
             gt_bbox_l = gt_bbox_l.copy()
             gt_bbox_l[:, 2:] += 1
 
-            iou = box_iou(pred_bbox_l, gt_bbox_l)
+            iou = bbox_iou(pred_bbox_l, gt_bbox_l)
             gt_index = iou.argmax(axis=1)
             gt_index[iou.max(axis=1) < iou_thresh] = -1
             del iou

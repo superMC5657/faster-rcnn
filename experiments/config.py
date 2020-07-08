@@ -46,7 +46,7 @@ class Config:
     # debug
     debug_file = '/tmp/debugf'
 
-    test_num = 10000
+    test_num = 1000
     # model
     load_path = None
     sgd_momentum = 0.9
