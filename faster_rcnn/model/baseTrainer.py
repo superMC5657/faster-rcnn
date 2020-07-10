@@ -7,13 +7,13 @@ import os
 from collections import namedtuple
 import time
 from torch.nn import functional as F
-from faster_rcnn.model.utils.creator_tool import AnchorTargetCreator, ProposalTargetCreator
+from faster_rcnn.model.utils.creator_tool import AnchorTargetCreator, ProposalTargetCreator, ProposalTargetCreatorNP
 
 from torch import nn
 import torch
-from faster_rcnn.utils import array_tool
-from faster_rcnn.utils.vis_tool import Visualizer
 
+from faster_rcnn.utils.vis_tool import Visualizer
+from faster_rcnn.utils import array_tool as at
 from experiments.config import opt
 from torchnet.meter import ConfusionMeter, AverageValueMeter
 
@@ -39,6 +39,7 @@ class FasterRCNNTrainer(nn.Module):
         self.anchor_target_creator = AnchorTargetCreator()
         self.proposal_target_creator = ProposalTargetCreator(loc_normalize_mean=rcnn.loc_normalize_mean,
                                                              loc_normalize_std=rcnn.loc_normalize_std)
+        self.proposal_target_creator_np = ProposalTargetCreatorNP()
 
         self.optimizer = self.rcnn.get_optimizer()
         self.vis = Visualizer(env=opt.env)
@@ -56,19 +57,23 @@ class FasterRCNNTrainer(nn.Module):
         img_size = list(imgs.shape)[2:4]
 
         features = self.rcnn.extractor(imgs)
-        rpn_locs, rpn_scores, rois, anchor = self.rcnn.rpn(features, img_size, scale)
+        rpn_locs, rpn_scores, rois, anchor = self.rcnn.rpn.forward(features, img_size, scale)
 
         bbox = bboxes[0]
         label = labels[0]
         rpn_score = rpn_scores[0]
         rpn_loc = rpn_locs[0]
-        roi = rois[0]
+        rois = rois[0]
 
-        sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creator(roi, bbox,
-                                                                            label)
+        sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creator.forward(rois, bbox, label)
+        # sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creator_np(at.tonumpy(rois), at.tonumpy(bbox),
+        #                                                                        at.tonumpy(label))
+        # sample_roi = at.totensor(sample_roi)
+        # gt_roi_loc = at.totensor(gt_roi_loc)
+        # gt_roi_label = at.totensor(gt_roi_label)
 
-        roi_cls_loc, roi_label = self.rcnn.head(features, sample_roi)
-        gt_rpn_loc, gt_rpn_label = self.anchor_target_creator(bbox, anchor, img_size)
+        roi_cls_loc, roi_label = self.rcnn.head.forward(features, sample_roi)
+        gt_rpn_loc, gt_rpn_label = self.anchor_target_creator.forward(bbox, anchor, img_size)
 
         gt_rpn_label = gt_rpn_label.long()
         gt_roi_label = gt_roi_label.long()
@@ -81,11 +86,11 @@ class FasterRCNNTrainer(nn.Module):
 
         n_sample = roi_cls_loc.shape[0]
         roi_cls_loc = roi_cls_loc.view(n_sample, -1, 4)
-        roi_loc = roi_cls_loc[torch.arange(0, n_sample).long().to(opt.device), gt_roi_label]
+        roi_loc = roi_cls_loc[torch.arange(0, n_sample).long(), gt_roi_label]
 
-        roi_loc_loss = self._rcnn_loc_loss(roi_loc, gt_roi_loc, gt_roi_label, self.roi_sigma)
-        roi_cls_loss = F.cross_entropy(roi_label, gt_roi_label)
-
+        roi_loc_loss = self._rcnn_loc_loss(roi_loc, gt_roi_loc, gt_roi_label.data, self.roi_sigma)
+        roi_cls_loss = self.CrossEntropyLoss(roi_label, gt_roi_label)
+        self.roi_cm.add(roi_label.detach(), gt_roi_label.detach())
         losses = [rpn_loc_loss, rpn_cls_loss, roi_loc_loss, roi_cls_loss]
         losses = losses + [sum(losses)]
 
@@ -94,6 +99,7 @@ class FasterRCNNTrainer(nn.Module):
     def _rcnn_loc_loss(self, pred_loc, gt_loc, gt_label, sigma):
         in_weight = torch.zeros(gt_loc.shape).to(opt.device)
         in_weight[(gt_label > 0).view(-1, 1).expand_as(in_weight).to(opt.device)] = 1
+        one_num = torch.where(in_weight == 1)[0]
         loc_loss = _smooth_l1_loss(pred_loc, gt_loc, in_weight.detach(), sigma)
         loc_loss /= ((gt_label >= 0).sum().float())
         return loc_loss
@@ -155,7 +161,7 @@ class FasterRCNNTrainer(nn.Module):
         return self
 
     def update_meters(self, losses):
-        loss_d = {k: array_tool.scalar(v) for k, v in losses._asdict().items()}
+        loss_d = {k: at.scalar(v) for k, v in losses._asdict().items()}
         for key, meter in self.meters.items():
             meter.add(loss_d[key])
 

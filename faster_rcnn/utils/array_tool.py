@@ -13,13 +13,12 @@ def tonumpy(data):
         return data.detach().cpu().numpy()
 
 
-def totensor(data, cuda=True):
+def totensor(data):
     if isinstance(data, np.ndarray):
         data = torch.from_numpy(data)
     if isinstance(data, torch.Tensor):
         data = data.detach()
-    if cuda:
-        data = data.to(opt.device)
+    data = data.to(opt.device)
     return data
 
 

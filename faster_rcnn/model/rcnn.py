@@ -47,7 +47,7 @@ class RoIHead(nn.Module):
         self.roi = RoIPool((self.roi_size, self.roi_size), self.spatial_scale)
 
     def forward(self, x, rois):
-        roi_indices = torch.zeros(rois.shape[0]).to(opt.device)
+        roi_indices = torch.zeros(rois.shape[0]).to(opt.device).float()
 
         indices_and_rois = torch.cat((roi_indices[:, None], rois), dim=1)
 

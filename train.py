@@ -74,8 +74,8 @@ def train(**kwargs):
             imgs = imgs.to(opt.device).float()
             gt_bboxes = gt_bboxes.to(opt.device)
             gt_labels = gt_labels.to(opt.device)
-            with torch.autograd.set_detect_anomaly(True):
-                trainer.train_step(imgs, gt_bboxes, gt_labels, scales)
+
+            trainer.train_step(imgs, gt_bboxes, gt_labels, scales)
 
             if (index + 1) % opt.plot_every == 0:
                 if os.path.exists(opt.debug_file):
@@ -92,8 +92,8 @@ def train(**kwargs):
 
                 trainer.vis.img('pred_img', pred_img)
 
-                trainer.vis.log(str(trainer.rpn_cm.value().tolist()), win='rpn_cm')
-                trainer.vis.img('roi_cm', array_tool.totensor(trainer.rpn_cm.conf, False).float())
+                trainer.vis.text(str(trainer.rpn_cm.value().tolist()), win='rpn_cm')
+                trainer.vis.img('roi_cm', array_tool.totensor(trainer.rpn_cm.conf).cpu().float())
 
         eval_result = eval(test_dataloader, rcnn, test_num=opt.test_num)
         trainer.vis.plot('test_map', eval_result['map'])

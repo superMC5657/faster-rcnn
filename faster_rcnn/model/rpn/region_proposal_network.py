@@ -1,12 +1,10 @@
-import numpy as np
 import torch
-
-from torch.nn import functional as F
 from torch import nn
+from torch.nn import functional as F
 
-from faster_rcnn.model.utils.normalize_tool import normal_init
 from faster_rcnn.model.utils.bbox_tool import generate_anchor_base
 from faster_rcnn.model.utils.creator_tool import ProposalCreator
+from faster_rcnn.model.utils.normalize_tool import normal_init
 
 
 class RegionProposalNetwork(nn.Module):

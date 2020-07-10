@@ -72,7 +72,7 @@ def calc_detection_voc_prec_rec(pred_bboxes, pred_labels, pred_scores, gt_bboxes
             gt_index[iou.max(axis=1) < iou_thresh] = -1
             del iou
 
-            select = np.zeros(gt_index.shape[0], dtype=bool)
+            select = np.zeros(gt_bbox_l.shape[0], dtype=bool)
             for gt_idx in gt_index:
                 if gt_idx >= 0:
                     if gt_difficult_l[gt_idx]:
