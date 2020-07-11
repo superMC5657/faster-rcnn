@@ -29,7 +29,7 @@ class Config:
     lr = 1e-3
 
     # visualization
-    env = 'faster_rcnn'  # visdom env
+    env = 'fasterRCNNtest'  # visdom env
     url = '10.20.216.3'
     port = 8097
     plot_every = 40  # vis every N iter
@@ -47,10 +47,10 @@ class Config:
 
     # debug
     debug_file = '/tmp/debugf'
-
-    test_num = 1000
+    train_num = None
+    test_num = 10000
     # model
-    load_path = None
+    load_path = 'checkpoints/fasterrcnn_07090452_0.7348953265105417'
     sgd_momentum = 0.9
     caffe_pretrain = False  # use caffe pretrained model instead of torchvision
     caffe_pretrain_path = 'checkpoints/vgg16_caffe.pth'

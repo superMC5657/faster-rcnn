@@ -6,14 +6,13 @@
 import os
 import ipdb
 import matplotlib
-import torch
 from tqdm import tqdm
 
 from experiments.config import opt
 from faster_rcnn.data.datasets.dataset import Dataset, TestDataset
 from faster_rcnn.data.transforms.image_utils import inverse_normalize
-from faster_rcnn.model.baseTrainer import FasterRCNNTrainer
-from faster_rcnn.model.rcnn import FasterRCNN
+from faster_rcnn.model.trainer.baseFasterTrainer import FasterRCNNTrainer
+from faster_rcnn.model.baseNets.fasterRCNN.fasterRCNN import FasterRCNN
 from torch.utils.data import DataLoader
 
 import resource
@@ -31,12 +30,12 @@ matplotlib.use('agg')
 def eval(dataloader, rcnn, test_num=10000):
     pred_bboxes, pred_labels, pred_scores = list(), list(), list()
     gt_bboxes, gt_labels, gt_difficults = list(), list(), list()
-    for index, (imgs_, sizes_, gt_bboxes_, gt_labels_, gt_difficult_) in enumerate(tqdm(dataloader)):
+    for index, (imgs_, sizes_, gt_bboxes_, gt_labels_, gt_difficults_) in enumerate(tqdm(dataloader)):
         sizes_ = [sizes_[0][0].item(), sizes_[1][0].item()]
         pred_bboxes_, pred_labels_, pred_scores_ = rcnn.predict(imgs_, [sizes_])
         gt_bboxes += list(gt_bboxes_.numpy())
         gt_labels += list(gt_labels_.numpy())
-        gt_difficults += list(gt_difficult_.numpy())
+        gt_difficults += list(gt_difficults_.numpy())
 
         pred_bboxes += pred_bboxes_
         pred_labels += pred_labels_
@@ -70,6 +69,8 @@ def train(**kwargs):
     for epoch in range(opt.epoch):
         trainer.reset_meters()
         for index, (imgs, gt_bboxes, gt_labels, scales) in enumerate(tqdm(dataloader)):
+            if index == opt.train_num:
+                break
             scales = array_tool.scalar(scales)
             imgs = imgs.to(opt.device).float()
             gt_bboxes = gt_bboxes.to(opt.device)

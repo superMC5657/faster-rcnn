@@ -8,23 +8,15 @@ from torchvision.ops import nms
 import numpy as np
 from faster_rcnn.data.transforms.image_utils import preprocess
 from faster_rcnn.model.utils.bbox_tool import loc2bbox
-from faster_rcnn.utils import array_tool
+from faster_rcnn.utils import array_tool as at
 from torch.nn import functional as F
 from experiments.config import opt
 
 
-def nograd(func):
-    def new_func(*args, **kwargs):
-        with torch.no_grad():
-            return func(*args, **kwargs)
-
-    return new_func
-
-
-class baseFasterRCNN(nn.Module):
+class BaseFasterRCNN(nn.Module):
     def __init__(self, extractor, rpn, head, loc_normalize_mean=(0., 0., 0., 0.),
                  loc_normalize_std=(0.1, 0.1, 0.2, 0.2)):
-        super(baseFasterRCNN, self).__init__()
+        super(BaseFasterRCNN, self).__init__()
         self.extractor = extractor
         self.rpn = rpn
         self.head = head
@@ -78,6 +70,7 @@ class baseFasterRCNN(nn.Module):
         return roi_cls_locs, roi_scores, rois
 
     # maybe batch inference
+
     @torch.no_grad()
     def predict(self, imgs, sizes=None, visualize=False):
         self.eval()
@@ -87,7 +80,7 @@ class baseFasterRCNN(nn.Module):
             sizes = list()
             for img in imgs:
                 size = img.shape[1:]
-                img = preprocess(array_tool.tonumpy(img))
+                img = preprocess(at.tonumpy(img))
                 prepared_imgs.append(img)
                 sizes.append(size)
         else:
@@ -98,12 +91,12 @@ class baseFasterRCNN(nn.Module):
         scores = list()
 
         for img, size in zip(prepared_imgs, sizes):
-            img = array_tool.totensor(img[None]).float()
+            img = at.totensor(img[None]).float()
             scale = img.shape[3] / size[1]
             roi_cls_loc, roi_scores, rois = self.forward(img, scale)
             roi_scores = roi_scores.data
             roi_cls_loc = roi_cls_loc.data
-            rois = array_tool.totensor(rois) / scale
+            rois = at.totensor(rois) / scale
 
             mean = torch.tensor(self.loc_normalize_mean).to(opt.device).repeat(self.n_class)[None]
             std = torch.tensor(self.loc_normalize_std).to(opt.device).repeat(self.n_class)[None]
@@ -123,7 +116,7 @@ class baseFasterRCNN(nn.Module):
             cls_bbox[:, 0::2] = cls_bbox[:, 0::2].clamp(min=0, max=size[0])  # x
             cls_bbox[:, 1::2] = cls_bbox[:, 1::2].clamp(min=0, max=size[1])  # y
 
-            prob = F.softmax(array_tool.totensor(roi_scores), dim=1)
+            prob = F.softmax(at.totensor(roi_scores), dim=1)
             bbox, label, score = self._suppress(cls_bbox, prob)
 
             bboxes.append(bbox)

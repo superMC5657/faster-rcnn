@@ -1,8 +1,8 @@
-from collections import defaultdict
 import itertools
+from collections import defaultdict
+
 import numpy as np
 from six import moves
-from torchvision.ops import box_iou
 
 from faster_rcnn.model.utils.bbox_tool import bbox_iou
 

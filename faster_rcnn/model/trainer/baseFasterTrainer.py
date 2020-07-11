@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
 # !@time: 2020/7/6 下午9:09
 # !@author: superMC @email: 18758266469@163.com
-# !@fileName: baseTrainer.py
+# !@fileName: baseFasterTrainer.py
 
 import os
 from collections import namedtuple
 import time
 from torch.nn import functional as F
-from faster_rcnn.model.utils.creator_tool import AnchorTargetCreator, ProposalTargetCreator, ProposalTargetCreatorNP
+from faster_rcnn.model.rpn.anchorTarget_creator import AnchorTargetCreator
 
 from torch import nn
 import torch
 
+from faster_rcnn.model.rpn.proposalTarget_creator import ProposalTargetCreator
 from faster_rcnn.utils.vis_tool import Visualizer
 from faster_rcnn.utils import array_tool as at
 from experiments.config import opt
@@ -39,7 +40,6 @@ class FasterRCNNTrainer(nn.Module):
         self.anchor_target_creator = AnchorTargetCreator()
         self.proposal_target_creator = ProposalTargetCreator(loc_normalize_mean=rcnn.loc_normalize_mean,
                                                              loc_normalize_std=rcnn.loc_normalize_std)
-        self.proposal_target_creator_np = ProposalTargetCreatorNP()
 
         self.optimizer = self.rcnn.get_optimizer()
         self.vis = Visualizer(env=opt.env)
@@ -57,6 +57,7 @@ class FasterRCNNTrainer(nn.Module):
         img_size = list(imgs.shape)[2:4]
 
         features = self.rcnn.extractor(imgs)
+
         rpn_locs, rpn_scores, rois, anchor = self.rcnn.rpn.forward(features, img_size, scale)
 
         bbox = bboxes[0]
@@ -66,11 +67,6 @@ class FasterRCNNTrainer(nn.Module):
         rois = rois[0]
 
         sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creator.forward(rois, bbox, label)
-        # sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creator_np(at.tonumpy(rois), at.tonumpy(bbox),
-        #                                                                        at.tonumpy(label))
-        # sample_roi = at.totensor(sample_roi)
-        # gt_roi_loc = at.totensor(gt_roi_loc)
-        # gt_roi_label = at.totensor(gt_roi_label)
 
         roi_cls_loc, roi_label = self.rcnn.head.forward(features, sample_roi)
         gt_rpn_loc, gt_rpn_label = self.anchor_target_creator.forward(bbox, anchor, img_size)
@@ -99,7 +95,6 @@ class FasterRCNNTrainer(nn.Module):
     def _rcnn_loc_loss(self, pred_loc, gt_loc, gt_label, sigma):
         in_weight = torch.zeros(gt_loc.shape).to(opt.device)
         in_weight[(gt_label > 0).view(-1, 1).expand_as(in_weight).to(opt.device)] = 1
-        one_num = torch.where(in_weight == 1)[0]
         loc_loss = _smooth_l1_loss(pred_loc, gt_loc, in_weight.detach(), sigma)
         loc_loss /= ((gt_label >= 0).sum().float())
         return loc_loss
@@ -150,9 +145,9 @@ class FasterRCNNTrainer(nn.Module):
     def load(self, path, load_optimizer=True, parse_opt=False, ):
         state_dict = torch.load(path)
         if 'model' in state_dict:
-            self.faster_rcnn.load_state_dict(state_dict['model'])
+            self.rcnn.load_state_dict(state_dict['model'])
         else:  # legacy way, for backward compatibility
-            self.faster_rcnn.load_state_dict(state_dict)
+            self.rcnn.load_state_dict(state_dict)
             return self
         if parse_opt:
             opt.parse(state_dict['config'])
