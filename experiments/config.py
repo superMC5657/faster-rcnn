@@ -48,9 +48,9 @@ class Config:
     # debug
     debug_file = '/tmp/debugf'
     train_num = None
-    test_num = 10000
+    test_num = 1000
     # model
-    load_path = 'checkpoints/fasterrcnn_07090452_0.7348953265105417'
+    load_path = None
     sgd_momentum = 0.9
     caffe_pretrain = False  # use caffe pretrained model instead of torchvision
     caffe_pretrain_path = 'checkpoints/vgg16_caffe.pth'
