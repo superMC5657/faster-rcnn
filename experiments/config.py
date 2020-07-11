@@ -47,7 +47,7 @@ class Config:
 
     # debug
     debug_file = '/tmp/debugf'
-    train_num = 10000
+    train_num = None
     test_num = 1000
     # model
     load_path = None
