@@ -7,14 +7,13 @@ import torch
 
 
 class Config:
-    # data
+
     train_voc_data_dir = '/home/supermc/Datasets/VOCdevkit/VOC2012'
     test_voc_data_dir = '/home/supermc/Datasets/VOCdevkit/VOC2007'
-    min_size = 600  # image resize
-    max_size = 1000  # image resize
-    batch_size = 1
-    num_workers = 8
-    test_num_workers = 8
+    size = (3, 640, 640)
+    batch_size = 2
+    num_workers = 1
+    test_num_workers = 1
 
     device = torch.device("cuda:0")
 

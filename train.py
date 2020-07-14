@@ -68,7 +68,7 @@ def train(**kwargs):
 
     for epoch in range(opt.epoch):
         trainer.reset_meters()
-        for index, (imgs, gt_bboxes, gt_labels, scales) in enumerate(tqdm(dataloader)):
+        for index, imgs in enumerate(dataloader):
             if index == opt.train_num:
                 break
             scales = array_tool.scalar(scales)

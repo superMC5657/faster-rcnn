@@ -3,9 +3,9 @@
 # !@author: superMC @email: 18758266469@163.com
 # !@fileName: bbox_tool.py
 
-from six import moves
-import torch
 import numpy as np
+import torch
+from six import moves
 
 #  loc 可能为bbox的偏移
 from experiments.config import opt
@@ -93,6 +93,25 @@ def bbox_iou(bbox_a, bbox_b):
     area_a = np.prod(bbox_a[:, 2:] - bbox_a[:, :2], axis=1)
     area_b = np.prod(bbox_b[:, 2:] - bbox_b[:, :2], axis=1)
     return area_i / (area_a[:, None] + area_b - area_i)
+
+
+def enumerate_shift_anchor(anchor_base, feat_stride, height, width):
+    shift_y = np.arange(0, height * feat_stride, feat_stride)
+    shift_x = np.arange(0, width * feat_stride, feat_stride)
+    shift_x, shift_y = np.meshgrid(shift_x, shift_y)
+    shift_x = torch.from_numpy(shift_x)
+    shift_y = torch.from_numpy(shift_y)
+
+    # shift_y = torch.arange(0, height * feat_stride, feat_stride)
+    # shift_x = torch.arange(0, width * feat_stride, feat_stride)
+    # shift_x, shift_y = torch.meshgrid(shift_x, shift_y)
+    shift = torch.stack((shift_y.flatten(), shift_x.flatten(), shift_y.flatten(), shift_x.flatten()), dim=1)
+
+    A = anchor_base.shape[0]
+    K = shift.shape[0]
+    anchor = anchor_base.reshape((1, A, 4)) + shift.reshape((1, K, 4)).permute((1, 0, 2))
+    anchor = anchor.reshape((K * A, 4)).type(torch.float32)
+    return anchor
 
 
 def __test():

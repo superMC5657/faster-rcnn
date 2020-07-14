@@ -310,7 +310,7 @@ def pytorch_normalze(img):
     return img.numpy()
 
 
-def preprocess(img, min_size=600, max_size=1000):
+def preprocess(img, size=(3, 640, 640)):
     """Preprocess an image for feature extraction.
 
     The length of the shorter edge is scaled to :obj:`self.min_size`.
@@ -330,12 +330,8 @@ def preprocess(img, min_size=600, max_size=1000):
         ~numpy.ndarray: A preprocessed image.
 
     """
-    C, H, W = img.shape
-    scale1 = min_size / min(H, W)
-    scale2 = max_size / max(H, W)
-    scale = min(scale1, scale2)
     img = img / 255.
-    img = sktsf.resize(img, (C, H * scale, W * scale), mode='reflect', anti_aliasing=False)
+    img = sktsf.resize(img, size, mode='reflect', anti_aliasing=False)
     # both the longer and shorter should be less than
     # max_size and min_size
     return pytorch_normalze(img)
@@ -343,14 +339,13 @@ def preprocess(img, min_size=600, max_size=1000):
 
 class Transform(object):
 
-    def __init__(self, min_size=600, max_size=1000):
-        self.min_size = min_size
-        self.max_size = max_size
+    def __init__(self, size=(3, 640, 640)):
+        self.size = size
 
     def __call__(self, in_data):
         img, bbox, label = in_data
         _, H, W = img.shape
-        img = preprocess(img, self.min_size, self.max_size)
+        img = preprocess(img, self.size)
         _, o_H, o_W = img.shape
         scale = o_H / H
         bbox = resize_bbox(bbox, (H, W), (o_H, o_W))
