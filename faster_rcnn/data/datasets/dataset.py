@@ -6,6 +6,7 @@ import torch
 
 from .voc_dataset import VOCBboxDataset
 from ..transforms.image_utils import Transform, preprocess
+from ...model.utils.bbox_tool import generate_anchor_base, enumerate_shift_anchor
 
 
 class Dataset:
@@ -13,6 +14,7 @@ class Dataset:
         self.opt = opt
         self.db = VOCBboxDataset(opt.train_voc_data_dir)
         self.tsf = Transform(opt.size)
+
 
     def __getitem__(self, idx):
         ori_img, bbox, label, difficult = self.db.get_example(idx)

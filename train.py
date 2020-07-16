@@ -17,6 +17,7 @@ from torch.utils.data import DataLoader
 
 import resource
 
+from faster_rcnn.model.utils.bbox_tool import generate_anchor_base, enumerate_shift_anchor
 from faster_rcnn.utils import array_tool
 from faster_rcnn.utils.eval_tool import eval_detection_voc
 from faster_rcnn.utils.vis_tool import visdom_bbox
@@ -52,6 +53,11 @@ def train(**kwargs):
     opt.parse(kwargs)
     dataset = Dataset(opt)
     print('load dataset')
+    anchor_base = generate_anchor_base(base_size=opt.anchor_base_size, anchor_scales=opt.anchor_scales,
+                                       ratios=opt.ratios)
+    opt.n_anchor = len(anchor_base)
+    opt.anchor = enumerate_shift_anchor(anchor_base, opt.feat_stride, opt.size[2] / opt.feat_stride,
+                                        opt.size[1] / opt.feat_stride)
     dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=True, num_workers=opt.num_workers)
     test_dataset = TestDataset(opt)
     test_dataloader = DataLoader(test_dataset, batch_size=opt.batch_size, shuffle=False,

@@ -11,6 +11,7 @@ class Config:
     train_voc_data_dir = '/home/supermc/Datasets/VOCdevkit/VOC2012'
     test_voc_data_dir = '/home/supermc/Datasets/VOCdevkit/VOC2007'
     size = (3, 640, 640)
+    feat_stride = 16
     batch_size = 2
     num_workers = 1
     test_num_workers = 1
@@ -68,6 +69,8 @@ class Config:
     def state_dict(self):
         return {k: getattr(self, k) for k, _ in Config.__dict__.items() \
                 if not k.startswith('_')}
+
+
 
 
 opt = Config()
