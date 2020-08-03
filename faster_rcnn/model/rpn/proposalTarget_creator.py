@@ -10,6 +10,7 @@ from faster_rcnn.model.utils.bbox_tool import bbox2loc
 import numpy as np
 from faster_rcnn.utils import array_tool as at
 
+
 class ProposalTargetCreator:
 
     def __init__(self, n_sample=128, pos_ratio=0.25, pos_iou_thresh=0.5, neg_iou_thresh_hi=0.5, neg_iou_thresh_lo=0.0,
@@ -22,9 +23,9 @@ class ProposalTargetCreator:
         self.loc_normalize_mean = loc_normalize_mean
         self.loc_normalize_std = loc_normalize_std
 
-    def forward(self, roi, bbox, label):
+    def single_forward(self, roi, bbox, label):
         n_bbox, _ = bbox.shape
-        roi = torch.cat((roi, bbox), dim=0)  # trick 一定有个bbox 适配 方便之后cls
+        roi = torch.cat((bbox, roi), dim=0)  # trick 一定有个bbox 适配 方便之后cls
         pos_roi_per_image = int(self.n_sample * self.pos_ratio)  # hard negative mining
         iou = box_iou(roi, bbox)
         gt_assignment = iou.argmax(dim=1)
@@ -58,5 +59,24 @@ class ProposalTargetCreator:
 
         return sample_roi, gt_roi_loc, gt_roi_label
 
-    def __call__(self, roi, bbox, label):
-        return self.forward(roi, bbox, label)
+    def __call__(self, rois, bboxs, labels):
+        batch_size = rois.shape[0]
+        sample_rois = []
+        gt_roi_locs = []
+        gt_roi_labels = []
+        for i in range(batch_size):
+            roi = rois[i]
+            bbox = bboxs[i]
+            label = labels[i]
+            arg = torch.where(label == -1.)[1]
+            len = label.shape[0] - arg.shape[0]
+            bbox = bbox[:len]
+            label = label[:len]
+            sample_roi, gt_roi_loc, gt_roi_label = self.single_forward(roi, bbox, label)
+            sample_rois.append(sample_roi)
+            gt_roi_locs.append(gt_roi_loc)
+            gt_roi_labels.append(gt_roi_label)
+        sample_rois = torch.stack(sample_rois, dim=0)
+        gt_roi_locs = torch.stack(gt_roi_locs, dim=0)
+        gt_roi_labels = torch.stack(gt_roi_labels, dim=0)
+        return sample_rois, gt_roi_locs, gt_roi_labels

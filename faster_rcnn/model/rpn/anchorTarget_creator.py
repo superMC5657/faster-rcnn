@@ -10,6 +10,7 @@ from experiments.config import opt
 from faster_rcnn.model.utils.bbox_tool import bbox2loc
 from faster_rcnn.utils import array_tool as at
 from faster_rcnn.model.rpn.tool import _get_inside_index, _unmap
+from faster_rcnn.model.utils.bbox_tool import generate_anchor_base, enumerate_shift_anchor
 
 
 class AnchorTargetCreator:
@@ -19,21 +20,33 @@ class AnchorTargetCreator:
         self.neg_iou_thresh = neg_iou_thresh
         self.pos_ratio = pos_ratio
 
-    def forward(self, bbox, anchor, img_size):
-        img_H, img_W = img_size
-        n_anchor = len(anchor)
-        inside_index = _get_inside_index(anchor, img_H, img_W)
-        anchor = anchor[inside_index].to(opt.device)
+        self.inside_index = _get_inside_index(opt.anchor, opt.size[1], opt.size[2])
+        self.anchor = opt.anchor[self.inside_index].cuda()
+        self.total_anchor_num = len(opt.anchor)
 
-        argmax_ious, label = self._creat_label(inside_index, anchor, bbox)
-
-        loc = bbox2loc(anchor, bbox[argmax_ious])
-        loc = _unmap(loc, n_anchor, inside_index, fill=0)
-        label = _unmap(label, n_anchor, inside_index, fill=-1)
+    def single_forward(self, bbox):
+        argmax_ious, label = self._creat_label(self.inside_index, self.anchor, bbox)
+        loc = bbox2loc(self.anchor, bbox[argmax_ious])
+        loc = _unmap(loc, self.total_anchor_num, self.inside_index, fill=0)
+        label = _unmap(label, self.total_anchor_num, self.inside_index, fill=-1)
         return loc.contiguous(), label.contiguous()
 
-    def __call__(self, bbox, anchor, img_size):
-        return self.forward(bbox, anchor, img_size)
+    def __call__(self, bboxes, labels):
+        batch_size = bboxes.shape[0]
+        rpn_locs = []
+        rpn_labels = []
+        for i in range(batch_size):
+            bbox = bboxes[i]
+            label = labels[i]
+            arg = torch.where(label == -1.)[1]
+            len = bbox.shape[0] - arg.shape[0]
+            bbox = bbox[:len]
+            rpn_loc, rpn_label = self.single_forward(bbox)
+            rpn_locs.append(rpn_loc)
+            rpn_labels.append(rpn_label)
+        rpn_locs = torch.stack(rpn_locs, dim=0)
+        rpn_labels = torch.stack(rpn_labels, dim=0)
+        return rpn_locs, rpn_labels
 
     # bugs : disable_index 生成问题
     def _creat_label(self, inside_index, anchor, bbox):
@@ -47,8 +60,6 @@ class AnchorTargetCreator:
 
         n_pos = int(self.pos_ratio * self.n_sample)
 
-        label = at.tonumpy(label)
-
         pos_index = np.where(label == 1)[0]
 
         if pos_index.shape[0] > n_pos:
@@ -60,8 +71,8 @@ class AnchorTargetCreator:
             label[disable_index] = -1
 
             # label = -1 不参与训练
-        # n_neg = self.n_sample - torch.sum(label == 1).item()
-        n_neg = self.n_sample - np.sum(label == 1)
+        n_neg = self.n_sample - torch.sum(label == 1).item()
+        # n_neg = self.n_sample - np.sum(label == 1)
         neg_index = np.where(label == 0)[0]
 
         if neg_index.shape[0] > n_neg:
@@ -71,8 +82,7 @@ class AnchorTargetCreator:
                 neg_index, size=(len(neg_index) - n_neg), replace=False)
             label[disable_index] = -1
 
-        label = at.totensor(label)
-        return argmax_ious, label
+        return argmax_ious, label.cuda()
 
     def _calc_ious(self, anchor, bbox, inside_index):
         ious = box_iou(anchor, bbox)

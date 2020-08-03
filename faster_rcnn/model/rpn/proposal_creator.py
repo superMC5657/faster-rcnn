@@ -19,7 +19,7 @@ class ProposalCreator:
         self.nms_thresh = nms_thresh
         self.n_train_pre_nms = n_train_pre_nms
 
-    def __call__(self, loc, score, anchor, img_size, scale=1.):
+    def __call__(self, loc, score, anchor, img_size):
         if self.parent_model.training:
             n_pre_nms = self.n_train_pre_nms
             n_post_nms = self.n_train_post_nms
@@ -34,7 +34,7 @@ class ProposalCreator:
         roi[:, 1] = torch.clamp(roi[:, 1], 0, img_size[1])
         roi[:, 3] = torch.clamp(roi[:, 3], 0, img_size[1])
 
-        min_size = self.min_size * scale
+        min_size = self.min_size
         hs = roi[:, 2] - roi[:, 0]
         ws = roi[:, 3] - roi[:, 1]
 

@@ -7,12 +7,26 @@ import torch
 
 
 class Config:
+    """
+    anchor
+    size = (3,height,width)
+    """
+    # size
+    size = (3, 640, 640)
+    feat_stride = 16
+    feat_width = size[2] // feat_stride
+    feat_height = size[1] // feat_stride
+    anchor_base_size = 16
+    anchor_scales = [8, 16, 32]
+    ratios = [0.5, 1.0, 2.0]
 
     train_voc_data_dir = '/home/supermc/Datasets/VOCdevkit/VOC2012'
     test_voc_data_dir = '/home/supermc/Datasets/VOCdevkit/VOC2007'
-    size = (3, 640, 640)
-    feat_stride = 16
-    batch_size = 2
+
+    data_path = "/home/supermc/Datasets"
+
+    project = "voc"
+    batch_size = 3
     num_workers = 1
     test_num_workers = 1
 
@@ -30,7 +44,7 @@ class Config:
 
     # visualization
     env = 'fasterRcnn'  # visdom env
-    url = '10.20.216.191'
+    url = '10.20.216.190'
     port = 8097
     plot_every = 40  # vis every N iter
 
@@ -69,8 +83,6 @@ class Config:
     def state_dict(self):
         return {k: getattr(self, k) for k, _ in Config.__dict__.items() \
                 if not k.startswith('_')}
-
-
 
 
 opt = Config()
