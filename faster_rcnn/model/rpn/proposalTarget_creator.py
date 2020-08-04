@@ -69,9 +69,9 @@ class ProposalTargetCreator:
             bbox = bboxs[i]
             label = labels[i]
             arg = torch.where(label == -1.)[1]
-            len = label.shape[0] - arg.shape[0]
-            bbox = bbox[:len]
-            label = label[:len]
+            _len = label.shape[0] - arg.shape[0]
+            bbox = bbox[:_len]
+            label = label[:_len]
             sample_roi, gt_roi_loc, gt_roi_label = self.single_forward(roi, bbox, label)
             sample_rois.append(sample_roi)
             gt_roi_locs.append(gt_roi_loc)

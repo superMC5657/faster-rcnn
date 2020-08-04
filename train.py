@@ -101,6 +101,31 @@ def train(**kwargs):
             annot = annot.to(opt.device)
 
             trainer.train_step(img, annot)
+            if (index + 1) % opt.plot_every == 0:
+                if os.path.exists(opt.debug_file):
+                    ipdb.set_trace()
+                trainer.vis.plot_many(trainer.get_meter_data())
+                ori_img_ = inverse_normalize(array_tool.tonumpy(img[0]))
+                bbox = annot[0, :, :4]
+                label = annot[0, :, 4:5].int()
+                arg = torch.where(label == -1.)[1]
+                _len = label.shape[0] - arg.shape[0]
+                bbox = bbox[:_len]
+                label = label[:_len]
+                label = label.squeeze()
+                gt_img = visdom_bbox(ori_img_, array_tool.tonumpy(bbox),
+                                     array_tool.tonumpy(label))
+                trainer.vis.img('gt_img', gt_img)
+
+                pred_bboxes, pred_labels, pred_scores = trainer.rcnn.predict([ori_img_], visualize=True)
+                pred_img = visdom_bbox(ori_img_, array_tool.tonumpy(pred_bboxes[0]),
+                                       array_tool.tonumpy(pred_labels[0]).reshape(-1),
+                                       array_tool.tonumpy(pred_scores[0]))
+
+                trainer.vis.img('pred_img', pred_img)
+
+                trainer.vis.text(str(trainer.rpn_cm.value().tolist()), win='rpn_cm')
+                trainer.vis.img('roi_cm', array_tool.totensor(trainer.rpn_cm.conf).cpu().float())
 
         # eval_result = eval(test_dataloader, rcnn, test_num=opt.test_num)
         # trainer.vis.plot('test_map', eval_result['map'])

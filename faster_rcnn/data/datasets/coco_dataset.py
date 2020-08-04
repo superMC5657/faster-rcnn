@@ -52,7 +52,10 @@ class CocoDataset(Dataset):
 
     def load_image(self, image_index):
         image_info = self.coco.loadImgs(self.image_ids[image_index])[0]
-        path = os.path.join(self.root_dir, 'JPEGImages', image_info['file_name'])
+        if "VOC" in self.set_name:
+            path = os.path.join(self.root_dir, 'JPEGImages', image_info['file_name'])
+        else:
+            path = os.path.join(self.root_dir, image_info['file_name'])
         img = cv2.imread(path)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 

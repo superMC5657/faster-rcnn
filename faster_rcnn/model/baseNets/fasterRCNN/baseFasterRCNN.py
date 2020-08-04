@@ -61,10 +61,10 @@ class BaseFasterRCNN(nn.Module):
         score = np.concatenate(score, axis=0).astype(np.float32)
         return bbox, label, score
 
-    def forward(self, x, scale=1.):
+    def forward(self, x):
         image_size = x.shape[2:]
         h = self.extractor(x)
-        rpn_locs, rpn_scores, rois = self.rpn(h, image_size, scale)
+        rpn_locs, rpn_scores, rois = self.rpn(h, image_size)
         rois = rois
         roi_cls_locs, roi_scores = self.head(h, rois)
         return roi_cls_locs, roi_scores, rois
@@ -93,7 +93,7 @@ class BaseFasterRCNN(nn.Module):
         for img, size in zip(prepared_imgs, sizes):
             img = at.totensor(img[None]).float()
             scale = img.shape[3] / size[1]
-            roi_cls_loc, roi_scores, rois = self.forward(img, scale)
+            roi_cls_loc, roi_scores, rois = self.forward(img)
             roi_scores = roi_scores.data
             roi_cls_loc = roi_cls_loc.data
             rois = at.totensor(rois) / scale
@@ -111,6 +111,7 @@ class BaseFasterRCNN(nn.Module):
 
             cls_bbox = cls_bbox.to(opt.device)
             cls_bbox = cls_bbox.view(-1, self.n_class * 4)
+            roi_scores = roi_scores.view(-1, self.n_class)
 
             # clip bbox
             cls_bbox[:, 0::2] = cls_bbox[:, 0::2].clamp(min=0, max=size[0])  # x
