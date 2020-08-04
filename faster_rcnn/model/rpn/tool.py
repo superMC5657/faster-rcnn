@@ -9,11 +9,11 @@ from experiments.config import opt
 
 def _unmap(data, count, index, fill=0):
     if len(data.shape) == 1:
-        ret = torch.zeros((count,), dtype=data.dtype).to(opt.device) + fill
-        ret[index] = data.to(opt.device)
+        ret = torch.zeros((count,), dtype=data.dtype).cuda() + fill
+        ret[index] = data
     else:
-        ret = torch.zeros((count,) + data.shape[1:], dtype=data.dtype).to(opt.device) + fill
-        ret[index, :] = data.to(opt.device)
+        ret = torch.zeros((count,) + data.shape[1:], dtype=data.dtype).cuda() + fill
+        ret[index, :] = data
     return ret
 
 

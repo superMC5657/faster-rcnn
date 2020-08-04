@@ -17,6 +17,22 @@ class Config:
     test_num_workers = 8
 
     device = torch.device("cuda:1")
+    """
+    anchor
+    size = (3,height,width)
+    """
+    # size
+    size = (3, 640, 640)
+    feat_stride = 16
+    feat_width = size[2] // feat_stride
+    feat_height = size[1] // feat_stride
+    anchor_base_size = 16
+    anchor_scales = [8, 16, 32]
+    ratios = [0.5, 1.0, 2.0]
+
+    data_path = "/home1/datasets"
+
+    project = "voc"
 
     # sigma for l1_smooth_loss
     rpn_sigma = 3.

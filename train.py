@@ -3,20 +3,17 @@
 # !@author: superMC @email: 18758266469@163.com
 # !@fileName: train.py
 
-import os
+import resource
+
 import ipdb
 import matplotlib
 from tqdm import tqdm
 
-from experiments.config import opt
-from faster_rcnn.data.datasets.dataset import Dataset, TestDataset
+from faster_rcnn.data.datasets.coco_dataset import *
 from faster_rcnn.data.transforms.image_utils import inverse_normalize
-from faster_rcnn.model.trainer.baseFasterTrainer import FasterRCNNTrainer
 from faster_rcnn.model.baseNets.fasterRCNN.fasterRCNN import FasterRCNN
-from torch.utils.data import DataLoader
-
-import resource
-
+from faster_rcnn.model.trainer.baseFasterTrainer import FasterRCNNTrainer
+from faster_rcnn.model.utils.bbox_tool import generate_anchor_base, enumerate_shift_anchor
 from faster_rcnn.utils import array_tool
 from faster_rcnn.utils.eval_tool import eval_detection_voc
 from faster_rcnn.utils.vis_tool import visdom_bbox
@@ -50,12 +47,40 @@ def eval(dataloader, rcnn, test_num=10000):
 
 def train(**kwargs):
     opt.parse(kwargs)
-    dataset = Dataset(opt)
+
+    anchor_base = generate_anchor_base(base_size=opt.anchor_base_size, anchor_scales=opt.anchor_scales,
+                                       ratios=opt.ratios)
+    opt.diff_anchor_num = len(anchor_base)
+    anchor = enumerate_shift_anchor(anchor_base, opt.feat_stride, opt.feat_height,
+                                    opt.feat_width)
+    opt.anchor = anchor
+
     print('load dataset')
-    dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=True, num_workers=opt.num_workers)
-    test_dataset = TestDataset(opt)
-    test_dataloader = DataLoader(test_dataset, batch_size=opt.batch_size, shuffle=False,
-                                 num_workers=opt.num_workers, pin_memory=True)
+
+    params = Params(f'projects/{opt.project}.yml')
+    training_params = {'batch_size': opt.batch_size,
+                       'shuffle': True,
+                       'drop_last': True,
+                       'collate_fn': collater,
+                       'num_workers': opt.num_workers}
+
+    val_params = {'batch_size': opt.batch_size,
+                  'shuffle': False,
+                  'drop_last': True,
+                  'collate_fn': collater,
+                  'num_workers': opt.num_workers}
+
+    training_set = CocoDataset(root_dir=os.path.join(opt.data_path, params.project_name, params.train_set),
+                               set=params.train_set,
+                               transform=transforms.Compose([Normalizer(mean=params.mean, std=params.std),
+                                                             Augmenter(),
+                                                             Resizer(opt.size[1])]))
+    training_generator = DataLoader(training_set, **training_params)
+
+    val_set = CocoDataset(root_dir=os.path.join(opt.data_path, params.project_name, params.val_set), set=params.val_set,
+                          transform=transforms.Compose([Normalizer(mean=params.mean, std=params.std),
+                                                        Resizer(opt.size[1])]))
+    val_generator = DataLoader(val_set, **val_params)
 
     rcnn = FasterRCNN(opt.pretrained_model)
     print('construct completed')
@@ -63,27 +88,33 @@ def train(**kwargs):
     trainer = FasterRCNNTrainer(rcnn).to(opt.device).train()
     if opt.load_path:
         trainer.load(opt.load_path)
-    trainer.vis.log(dataset.db.label_names, win='labels')
     best_map = 0
 
     for epoch in range(opt.epoch):
         trainer.reset_meters()
-        for index, (imgs, gt_bboxes, gt_labels, scales) in enumerate(tqdm(dataloader)):
+        for index, sample in enumerate(tqdm(training_generator)):
             if index == opt.train_num:
                 break
-            scales = array_tool.scalar(scales)
-            imgs = imgs.to(opt.device).float()
-            gt_bboxes = gt_bboxes.to(opt.device)
-            gt_labels = gt_labels.to(opt.device)
+            img = sample['img']
+            annot = sample['annot']
+            img = img.to(opt.device).float()
+            annot = annot.to(opt.device)
 
-            trainer.train_step(imgs, gt_bboxes, gt_labels, scales)
-
+            trainer.train_step(img, annot)
             if (index + 1) % opt.plot_every == 0:
                 if os.path.exists(opt.debug_file):
                     ipdb.set_trace()
                 trainer.vis.plot_many(trainer.get_meter_data())
-                ori_img_ = inverse_normalize(array_tool.tonumpy(imgs[0]))
-                gt_img = visdom_bbox(ori_img_, array_tool.tonumpy(gt_bboxes[0]), array_tool.tonumpy(gt_labels[0]))
+                ori_img_ = inverse_normalize(array_tool.tonumpy(img[0]))
+                bbox = annot[0, :, :4]
+                label = annot[0, :, 4:5].int()
+                arg = torch.where(label == -1.)[1]
+                _len = label.shape[0] - arg.shape[0]
+                bbox = bbox[:_len]
+                label = label[:_len]
+                label = label.squeeze()
+                gt_img = visdom_bbox(ori_img_, array_tool.tonumpy(bbox),
+                                     array_tool.tonumpy(label))
                 trainer.vis.img('gt_img', gt_img)
 
                 pred_bboxes, pred_labels, pred_scores = trainer.rcnn.predict([ori_img_], visualize=True)
@@ -96,20 +127,20 @@ def train(**kwargs):
                 trainer.vis.text(str(trainer.rpn_cm.value().tolist()), win='rpn_cm')
                 trainer.vis.img('roi_cm', array_tool.totensor(trainer.rpn_cm.conf).cpu().float())
 
-        eval_result = eval(test_dataloader, rcnn, test_num=opt.test_num)
-        trainer.vis.plot('test_map', eval_result['map'])
-        lr_ = trainer.rcnn.optimizer.param_groups[0]['lr']
-        log_info = 'lr:{}\n map:{}\nloss:{}'.format(str(lr_), str(eval_result['map']), str(trainer.get_meter_data()))
-        trainer.vis.log(log_info)
-
-        if eval_result['map'] >= best_map:
-            best_map = eval_result['map']
-            best_path = trainer.save(best_map=best_map)
-        if epoch == 9:
-            trainer.load(best_path)
-            trainer.rcnn.scale_lr(opt.lr_decay)
-        if epoch == 13:
-            break
+        # eval_result = eval(test_dataloader, rcnn, test_num=opt.test_num)
+        # trainer.vis.plot('test_map', eval_result['map'])
+        # lr_ = trainer.rcnn.optimizer.param_groups[0]['lr']
+        # log_info = 'lr:{}\n map:{}\nloss:{}'.format(str(lr_), str(eval_result['map']), str(trainer.get_meter_data()))
+        # trainer.vis.log(log_info)
+        #
+        # if eval_result['map'] >= best_map:
+        #     best_map = eval_result['map']
+        #     best_path = trainer.save(best_map=best_map)
+        # if epoch == 9:
+        #     trainer.load(best_path)
+        #     trainer.rcnn.scale_lr(opt.lr_decay)
+        # if epoch == 13:
+        #     break
 
 
 if __name__ == '__main__':

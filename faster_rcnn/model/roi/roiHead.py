@@ -28,15 +28,16 @@ class RoIHead(nn.Module):
         self.roi = RoIPool((self.roi_size, self.roi_size), self.spatial_scale)
 
     def forward(self, x, rois):
-        roi_indices = torch.zeros(rois.shape[0]).to(opt.device).float()
-
-        indices_and_rois = torch.cat((roi_indices[:, None], rois), dim=1)
-
-        # yx->xy
-        indices_and_rois = indices_and_rois[:, [0, 2, 1, 4, 3]].contiguous()
-        pool = self.roi(x, indices_and_rois)
-        pool = pool.view(pool.size(0), -1).contiguous()
-        fc7 = self.classifier(pool)
+        roi_indices = torch.zeros(rois.shape[:2]).to(opt.device).float()
+        batch_size = rois.shape[0]
+        indices_and_rois = torch.cat((roi_indices[:, :, None], rois), dim=2)
+        pools = []
+        for i in range(batch_size):
+            pool = self.roi(x, indices_and_rois[i])
+            pools.append(pool)
+        pools = torch.stack(pools, dim=0)
+        pools = pools.view(batch_size, pools.shape[1], -1).contiguous()
+        fc7 = self.classifier(pools)
         roi_cls_locs = self.cls_loc(fc7)
         roi_scores = self.score(fc7)
         return roi_cls_locs, roi_scores

@@ -37,10 +37,9 @@ class FasterRCNNTrainer(nn.Module):
         self.rpn_sigma = opt.rpn_sigma
         self.roi_sigma = opt.roi_sigma
 
-        self.anchor_target_creator = AnchorTargetCreator()
         self.proposal_target_creator = ProposalTargetCreator(loc_normalize_mean=rcnn.loc_normalize_mean,
                                                              loc_normalize_std=rcnn.loc_normalize_std)
-
+        self.anchor_target_creator = AnchorTargetCreator()
         self.optimizer = self.rcnn.get_optimizer()
         self.vis = Visualizer(env=opt.env)
 
@@ -49,44 +48,44 @@ class FasterRCNNTrainer(nn.Module):
         self.meters = {k: AverageValueMeter() for k in LossTuple._fields}
         self.CrossEntropyLoss = nn.CrossEntropyLoss()
 
-    def forward(self, imgs, bboxes, labels, scale):
-        batch_size = bboxes.shape[0]
-        if batch_size != 1:
-            raise ValueError('Currently only batch_size of 1 is supported')
+    def forward(self, img, annot):
+        batch_size = img.shape[0]
+        bboxes = annot[..., :4]
+        labels = annot[..., 4:5]
 
-        img_size = list(imgs.shape)[2:4]
+        features = self.rcnn.extractor(img)
 
-        features = self.rcnn.extractor(imgs)
+        rpn_locs, rpn_scores, rois = self.rcnn.rpn.forward(features, opt.size[1:])
+        sample_rois, gt_roi_locs, gt_roi_labels = self.proposal_target_creator(rois, bboxes, labels)
 
-        rpn_locs, rpn_scores, rois, anchor = self.rcnn.rpn.forward(features, img_size, scale)
+        roi_cls_locs, roi_labels = self.rcnn.head.forward(features, sample_rois)
+        gt_rpn_locs, gt_rpn_labels = self.anchor_target_creator(bboxes, labels)
 
-        bbox = bboxes[0]
-        label = labels[0]
-        rpn_score = rpn_scores[0]
-        rpn_loc = rpn_locs[0]
-        rois = rois[0]
+        gt_rpn_labels = gt_rpn_labels.long()
+        gt_roi_labels = gt_roi_labels.long()
+        rpn_loc_loss = self._rcnn_loc_loss(rpn_locs.view(-1, 4), gt_rpn_locs.view(-1, 4),
+                                           gt_rpn_labels.data.view(-1, 1), self.rpn_sigma)
+        rpn_cls_loss = F.cross_entropy(rpn_scores.view(-1, 2), gt_rpn_labels.view(-1), ignore_index=-1)
 
-        sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creator.forward(rois, bbox, label)
-
-        roi_cls_loc, roi_label = self.rcnn.head.forward(features, sample_roi)
-        gt_rpn_loc, gt_rpn_label = self.anchor_target_creator.forward(bbox, anchor, img_size)
-
-        gt_rpn_label = gt_rpn_label.long()
-        gt_roi_label = gt_roi_label.long()
-        rpn_loc_loss = self._rcnn_loc_loss(rpn_loc, gt_rpn_loc, gt_rpn_label.data, self.rpn_sigma)
-        rpn_cls_loss = F.cross_entropy(rpn_score, gt_rpn_label, ignore_index=-1)
-
-        _gt_rpn_label = gt_rpn_label[gt_rpn_label > -1]
-        _rpn_score = rpn_score[gt_rpn_label > -1]
+        _gt_rpn_label = gt_rpn_labels[gt_rpn_labels > -1]
+        _rpn_score = rpn_scores[gt_rpn_labels > -1]
         self.rpn_cm.add(_rpn_score.detach(), _gt_rpn_label.detach())
 
-        n_sample = roi_cls_loc.shape[0]
-        roi_cls_loc = roi_cls_loc.view(n_sample, -1, 4)
-        roi_loc = roi_cls_loc[torch.arange(0, n_sample).long(), gt_roi_label]
+        n_sample = roi_cls_locs.shape[1]
+        roi_cls_locs = roi_cls_locs.view(batch_size, n_sample, -1, 4)
+        roi_locs = []
+        for i in range(batch_size):
+            roi_cls_loc = roi_cls_locs[i]
+            gt_roi_label = gt_roi_labels[i].squeeze()
+            roi_loc = roi_cls_loc[torch.arange(0, n_sample).long(), gt_roi_label]
+            roi_locs.append(roi_loc)
+        roi_locs = torch.stack(roi_locs, dim=0)
 
-        roi_loc_loss = self._rcnn_loc_loss(roi_loc, gt_roi_loc, gt_roi_label.data, self.roi_sigma)
-        roi_cls_loss = self.CrossEntropyLoss(roi_label, gt_roi_label)
-        self.roi_cm.add(roi_label.detach(), gt_roi_label.detach())
+        roi_loc_loss = self._rcnn_loc_loss(roi_locs.view(-1, 4), gt_roi_locs.view(-1, 4),
+                                           gt_roi_labels.data.view(-1, 1),
+                                           self.roi_sigma)
+        roi_cls_loss = self.CrossEntropyLoss(roi_labels.view(-1, 21), gt_roi_labels.view(-1))
+        self.roi_cm.add(roi_labels.view(-1, 21).detach(), gt_roi_labels.view(-1).detach())
         losses = [rpn_loc_loss, rpn_cls_loss, roi_loc_loss, roi_cls_loss]
         losses = losses + [sum(losses)]
 
@@ -94,14 +93,14 @@ class FasterRCNNTrainer(nn.Module):
 
     def _rcnn_loc_loss(self, pred_loc, gt_loc, gt_label, sigma):
         in_weight = torch.zeros(gt_loc.shape).to(opt.device)
-        in_weight[(gt_label > 0).view(-1, 1).expand_as(in_weight).to(opt.device)] = 1
+        in_weight[(gt_label > 0).expand_as(in_weight).to(opt.device)] = 1
         loc_loss = _smooth_l1_loss(pred_loc, gt_loc, in_weight.detach(), sigma)
         loc_loss /= ((gt_label >= 0).sum().float())
         return loc_loss
 
-    def train_step(self, imgs, bboxes, labels, scale):
+    def train_step(self, img, annot):
         self.optimizer.zero_grad()
-        losses = self.forward(imgs, bboxes, labels, scale)
+        losses = self.forward(img, annot)
         losses.total_loss.backward()
         self.optimizer.step()
         self.update_meters(losses)
