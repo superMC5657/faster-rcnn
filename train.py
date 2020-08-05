@@ -26,21 +26,29 @@ matplotlib.use('agg')
 
 def eval(dataloader, rcnn, test_num=10000):
     pred_bboxes, pred_labels, pred_scores = list(), list(), list()
-    gt_bboxes, gt_labels, gt_difficults = list(), list(), list()
-    for index, (imgs_, sizes_, gt_bboxes_, gt_labels_, gt_difficults_) in enumerate(tqdm(dataloader)):
-        sizes_ = [sizes_[0][0].item(), sizes_[1][0].item()]
-        pred_bboxes_, pred_labels_, pred_scores_ = rcnn.predict(imgs_, [sizes_])
-        gt_bboxes += list(gt_bboxes_.numpy())
-        gt_labels += list(gt_labels_.numpy())
-        gt_difficults += list(gt_difficults_.numpy())
+    gt_bboxes, gt_labels = list(), list()
+    for index, sample in enumerate(tqdm(dataloader)):
+        img = sample['img']
+        annot = sample['annot']
+        img = img.to(opt.device).float()
+        annot = annot.to(opt.device)
+        bbox = annot[0, :, :4]
+        label = annot[0, :, 4:5].int()
+        arg = torch.where(label == -1.)[1]
+        _len = label.shape[0] - arg.shape[0]
+        bbox = bbox[:_len]
+        label = label[:_len]
+        pred_bboxes_, pred_labels_, pred_scores_ = rcnn.predict(img)
 
+        gt_bboxes += [bbox.cpu().numpy()]
+        gt_labels += [label.squeeze(dim=-1).cpu().numpy()]
         pred_bboxes += pred_bboxes_
         pred_labels += pred_labels_
         pred_scores += pred_scores_
 
         if index == test_num:
             break
-    result = eval_detection_voc(pred_bboxes, pred_labels, pred_scores, gt_bboxes, gt_labels, gt_difficults,
+    result = eval_detection_voc(pred_bboxes, pred_labels, pred_scores, gt_bboxes, gt_labels,
                                 use_07_metric=True)
     return result
 
@@ -64,7 +72,7 @@ def train(**kwargs):
                        'collate_fn': collater,
                        'num_workers': opt.num_workers}
 
-    val_params = {'batch_size': opt.batch_size,
+    val_params = {'batch_size': 1,
                   'shuffle': False,
                   'drop_last': True,
                   'collate_fn': collater,
@@ -129,20 +137,20 @@ def train(**kwargs):
                 trainer.vis.text(str(trainer.rpn_cm.value().tolist()), win='rpn_cm')
                 trainer.vis.img('roi_cm', array_tool.totensor(trainer.rpn_cm.conf).cpu().float())
 
-        # eval_result = eval(test_dataloader, rcnn, test_num=opt.test_num)
-        # trainer.vis.plot('test_map', eval_result['map'])
-        # lr_ = trainer.rcnn.optimizer.param_groups[0]['lr']
-        # log_info = 'lr:{}\n map:{}\nloss:{}'.format(str(lr_), str(eval_result['map']), str(trainer.get_meter_data()))
-        # trainer.vis.log(log_info)
-        #
-        # if eval_result['map'] >= best_map:
-        #     best_map = eval_result['map']
-        #     best_path = trainer.save(best_map=best_map)
-        # if epoch == 9:
-        #     trainer.load(best_path)
-        #     trainer.rcnn.scale_lr(opt.lr_decay)
-        # if epoch == 13:
-        #     break
+        eval_result = eval(val_generator, rcnn, test_num=opt.test_num)
+        trainer.vis.plot('test_map', eval_result['map'])
+        lr_ = trainer.rcnn.optimizer.param_groups[0]['lr']
+        log_info = 'lr:{}\n map:{}\nloss:{}'.format(str(lr_), str(eval_result['map']), str(trainer.get_meter_data()))
+        trainer.vis.log(log_info)
+
+        if eval_result['map'] >= best_map:
+            best_map = eval_result['map']
+            best_path = trainer.save(best_map=best_map)
+        if epoch == 9:
+            trainer.load(best_path)
+            trainer.rcnn.scale_lr(opt.lr_decay)
+        if epoch == 13:
+            break
 
 
 def xy2yx(bbox):

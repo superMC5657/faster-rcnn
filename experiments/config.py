@@ -7,16 +7,6 @@ import torch
 
 
 class Config:
-    # data
-    train_voc_data_dir = '/home1/datasets/VOCdevkit/VOC2012'
-    test_voc_data_dir = '/home1/datasets/VOCdevkit/VOC2007'
-    min_size = 600  # image resize
-    max_size = 1000  # image resize
-    batch_size = 2
-    num_workers = 3
-    test_num_workers = 3
-
-    device = torch.device("cuda:1")
     """
     anchor
     size = (3,height,width)
@@ -30,9 +20,17 @@ class Config:
     anchor_scales = [8, 16, 32]
     ratios = [0.5, 1.0, 2.0]
 
-    data_path = "/home1/datasets"
+    train_voc_data_dir = '/home/supermc/Datasets/VOCdevkit/VOC2012'
+    test_voc_data_dir = '/home/supermc/Datasets/VOCdevkit/VOC2007'
+
+    data_path = "/home/supermc/Datasets"
 
     project = "voc"
+    batch_size = 2
+    num_workers = 1
+    test_num_workers = 1
+
+    device = torch.device("cuda:0")
 
     # sigma for l1_smooth_loss
     rpn_sigma = 3.
@@ -45,8 +43,8 @@ class Config:
     lr = 1e-3
 
     # visualization
-    env = 'fasterRCNNtest'  # visdom env
-    url = '10.20.216.3'
+    env = 'fasterRcnn'  # visdom env
+    url = '10.20.216.190'
     port = 8097
     plot_every = 40  # vis every N iter
 

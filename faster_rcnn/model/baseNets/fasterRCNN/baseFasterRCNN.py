@@ -71,7 +71,7 @@ class BaseFasterRCNN(nn.Module):
     # maybe batch inference
 
     @torch.no_grad()
-    def predict(self, imgs, sizes=None, visualize=False):
+    def predict(self, imgs, visualize=False):
         self.eval()
         if visualize:
             self.use_preset('visualize')
@@ -84,6 +84,7 @@ class BaseFasterRCNN(nn.Module):
                 sizes.append(size)
         else:
             prepared_imgs = imgs
+            sizes = [opt.size[1:] for _ in imgs]
 
         bboxes = list()
         labels = list()
