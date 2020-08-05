@@ -112,13 +112,15 @@ def train(**kwargs):
                 _len = label.shape[0] - arg.shape[0]
                 bbox = bbox[:_len]
                 label = label[:_len]
-                label = label.squeeze()
+                label = label.squeeze(dim=-1)
+                bbox = xy2yx(bbox)
                 gt_img = visdom_bbox(ori_img_, array_tool.tonumpy(bbox),
                                      array_tool.tonumpy(label))
                 trainer.vis.img('gt_img', gt_img)
 
                 pred_bboxes, pred_labels, pred_scores = trainer.rcnn.predict([ori_img_], visualize=True)
-                pred_img = visdom_bbox(ori_img_, array_tool.tonumpy(pred_bboxes[0]),
+                pred_bbox = xy2yx(pred_bboxes[0])
+                pred_img = visdom_bbox(ori_img_, array_tool.tonumpy(pred_bbox),
                                        array_tool.tonumpy(pred_labels[0]).reshape(-1),
                                        array_tool.tonumpy(pred_scores[0]))
 
@@ -141,6 +143,10 @@ def train(**kwargs):
         #     trainer.rcnn.scale_lr(opt.lr_decay)
         # if epoch == 13:
         #     break
+
+
+def xy2yx(bbox):
+    return bbox[:, [1, 0, 3, 2]]
 
 
 if __name__ == '__main__':

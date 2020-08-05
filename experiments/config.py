@@ -12,9 +12,9 @@ class Config:
     test_voc_data_dir = '/home1/datasets/VOCdevkit/VOC2007'
     min_size = 600  # image resize
     max_size = 1000  # image resize
-    batch_size = 1
-    num_workers = 8
-    test_num_workers = 8
+    batch_size = 2
+    num_workers = 3
+    test_num_workers = 3
 
     device = torch.device("cuda:1")
     """

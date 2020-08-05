@@ -21,7 +21,7 @@ class AnchorTargetCreator:
         self.pos_ratio = pos_ratio
 
         self.inside_index = _get_inside_index(opt.anchor, opt.size[1], opt.size[2])
-        self.anchor = opt.anchor[self.inside_index].cuda()
+        self.anchor = opt.anchor[self.inside_index].to(opt.device)
         self.total_anchor_num = len(opt.anchor)
 
     def single_forward(self, bbox):
@@ -39,8 +39,8 @@ class AnchorTargetCreator:
             bbox = bboxes[i]
             label = labels[i]
             arg = torch.where(label == -1.)[1]
-            len = bbox.shape[0] - arg.shape[0]
-            bbox = bbox[:len]
+            _len = bbox.shape[0] - arg.shape[0]
+            bbox = bbox[:_len]
             rpn_loc, rpn_label = self.single_forward(bbox)
             rpn_locs.append(rpn_loc)
             rpn_labels.append(rpn_label)
@@ -82,7 +82,7 @@ class AnchorTargetCreator:
                 neg_index, size=(len(neg_index) - n_neg), replace=False)
             label[disable_index] = -1
 
-        return argmax_ious, label.cuda()
+        return argmax_ious, label.to(opt.device)
 
     def _calc_ious(self, anchor, bbox, inside_index):
         ious = box_iou(anchor, bbox)

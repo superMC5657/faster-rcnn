@@ -65,7 +65,6 @@ class BaseFasterRCNN(nn.Module):
         image_size = x.shape[2:]
         h = self.extractor(x)
         rpn_locs, rpn_scores, rois = self.rpn(h, image_size)
-        rois = rois
         roi_cls_locs, roi_scores = self.head(h, rois)
         return roi_cls_locs, roi_scores, rois
 
