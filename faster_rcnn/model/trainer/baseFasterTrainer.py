@@ -55,16 +55,16 @@ class FasterRCNNTrainer(nn.Module):
 
         features = self.rcnn.extractor(img)
 
-        rpn_locs, rpn_scores, rois = self.rcnn.rpn.forward(features, opt.size[1:])
-        sample_rois, gt_roi_locs, gt_roi_labels = self.proposal_target_creator(rois, bboxes, labels)
-
-        roi_cls_locs, roi_labels = self.rcnn.head.forward(features, sample_rois)
         gt_rpn_locs, gt_rpn_labels = self.anchor_target_creator(bboxes, labels)
+        rpn_locs, rpn_scores, rois = self.rcnn.rpn.forward(features, opt.size[1:])
+
+        sample_rois, gt_roi_locs, gt_roi_labels = self.proposal_target_creator(rois, bboxes, labels)
+        roi_cls_locs, roi_labels = self.rcnn.head.forward(features, sample_rois)
 
         gt_rpn_labels = gt_rpn_labels.long()
         gt_roi_labels = gt_roi_labels.long()
         rpn_loc_loss = self._rcnn_loc_loss(rpn_locs.view(-1, 4), gt_rpn_locs.view(-1, 4),
-                                           gt_rpn_labels.data.view(-1, 1), self.rpn_sigma)
+                                           gt_rpn_labels.data.view(-1), self.rpn_sigma)
         rpn_cls_loss = F.cross_entropy(rpn_scores.view(-1, 2), gt_rpn_labels.view(-1), ignore_index=-1)
 
         _gt_rpn_label = gt_rpn_labels[gt_rpn_labels > -1]
@@ -82,7 +82,7 @@ class FasterRCNNTrainer(nn.Module):
         roi_locs = torch.stack(roi_locs, dim=0)
 
         roi_loc_loss = self._rcnn_loc_loss(roi_locs.view(-1, 4), gt_roi_locs.view(-1, 4),
-                                           gt_roi_labels.data.view(-1, 1),
+                                           gt_roi_labels.data.view(-1),
                                            self.roi_sigma)
         roi_cls_loss = self.CrossEntropyLoss(roi_labels.view(-1, 21), gt_roi_labels.view(-1))
         self.roi_cm.add(roi_labels.view(-1, 21).detach(), gt_roi_labels.view(-1).detach())

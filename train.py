@@ -12,8 +12,9 @@ from tqdm import tqdm
 from faster_rcnn.data.datasets.coco_dataset import *
 from faster_rcnn.data.transforms.image_utils import inverse_normalize
 from faster_rcnn.model.baseNets.fasterRCNN.fasterRCNN import FasterRCNN
+from faster_rcnn.model.rpn.anchorTarget_creator import AnchorTargetCreator
 from faster_rcnn.model.trainer.baseFasterTrainer import FasterRCNNTrainer
-from faster_rcnn.model.utils.bbox_tool import generate_anchor_base, enumerate_shift_anchor
+from faster_rcnn.model.utils.bbox_tool import generate_anchor_base, enumerate_shift_anchor, loc2bbox
 from faster_rcnn.utils import array_tool
 from faster_rcnn.utils.eval_tool import eval_detection_voc
 from faster_rcnn.utils.vis_tool import visdom_bbox
@@ -121,9 +122,13 @@ def train(**kwargs):
                 bbox = bbox[:_len]
                 label = label[:_len]
                 label = label.squeeze(dim=-1)
+                rpn_img = display(ori_img_, bbox)
+                trainer.vis.img('rpn_img', rpn_img)
+
                 bbox = xy2yx(bbox)
                 gt_img = visdom_bbox(ori_img_, array_tool.tonumpy(bbox),
                                      array_tool.tonumpy(label))
+
                 trainer.vis.img('gt_img', gt_img)
 
                 pred_bboxes, pred_labels, pred_scores = trainer.rcnn.predict([ori_img_], visualize=True)
@@ -151,6 +156,18 @@ def train(**kwargs):
             trainer.rcnn.scale_lr(opt.lr_decay)
         if epoch == 13:
             break
+
+
+def display(ori_img_, bbox):
+    loc, label = AnchorTargetCreator().single_forward(bbox)
+    label_1 = torch.where(label == 1)[0]
+    loc = loc[label_1]
+    label = label[label_1]
+    anchor = opt.anchor[label_1]
+    rpn_bbox = loc2bbox(anchor, loc)
+    rpn_bbox = xy2yx(rpn_bbox)
+    rpn_img = visdom_bbox(ori_img_, array_tool.tonumpy(rpn_bbox), array_tool.tonumpy(label))
+    return rpn_img
 
 
 def xy2yx(bbox):
