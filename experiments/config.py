@@ -61,8 +61,8 @@ class Config:
 
     # debug
     debug_file = '/tmp/debugf'
-    train_num = None
-    test_num = 1000
+    train_num = 0
+    test_num = 100
     # model
     load_path = None
     sgd_momentum = 0.9

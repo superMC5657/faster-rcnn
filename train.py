@@ -131,7 +131,15 @@ def train(**kwargs):
 
                 trainer.vis.img('gt_img', gt_img)
 
-                pred_bboxes, pred_labels, pred_scores = trainer.rcnn.predict([ori_img_], visualize=True)
+                pred_bboxes, pred_labels, pred_scores, gt_box, gt_label = trainer.rcnn.predict([ori_img_], bbox, label,
+                                                                                               visualize=True)
+
+                gt_box = gt_box[:_len]
+                gt_label = gt_label[:_len]
+                gt_box = xy2yx(gt_box)
+                roi_img = visdom_bbox(ori_img_, array_tool.tonumpy(gt_box), array_tool.tonumpy(gt_label))
+                trainer.vis.img('roi_img', roi_img)
+
                 pred_bbox = xy2yx(pred_bboxes[0])
                 pred_img = visdom_bbox(ori_img_, array_tool.tonumpy(pred_bbox),
                                        array_tool.tonumpy(pred_labels[0]).reshape(-1),

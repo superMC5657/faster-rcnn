@@ -93,7 +93,7 @@ class FasterRCNNTrainer(nn.Module):
 
     def _rcnn_loc_loss(self, pred_loc, gt_loc, gt_label, sigma):
         in_weight = torch.zeros(gt_loc.shape).to(opt.device)
-        in_weight[(gt_label > 0).expand_as(in_weight).to(opt.device)] = 1
+        in_weight[(gt_label > 0).view(-1, 1).expand_as(in_weight).to(opt.device)] = 1
         loc_loss = _smooth_l1_loss(pred_loc, gt_loc, in_weight.detach(), sigma)
         loc_loss /= ((gt_label >= 0).sum().float())
         return loc_loss

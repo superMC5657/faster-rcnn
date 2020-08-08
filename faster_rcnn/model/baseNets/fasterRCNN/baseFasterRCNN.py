@@ -7,6 +7,7 @@ from torch import nn
 from torchvision.ops import nms
 import numpy as np
 from faster_rcnn.data.transforms.image_utils import preprocess
+from faster_rcnn.model.rpn.proposalTarget_creator import ProposalTargetCreator
 from faster_rcnn.model.utils.bbox_tool import loc2bbox
 from faster_rcnn.utils import array_tool as at
 from torch.nn import functional as F
@@ -24,6 +25,8 @@ class BaseFasterRCNN(nn.Module):
         self.loc_normalize_mean = loc_normalize_mean
         self.loc_normalize_std = loc_normalize_std
         self.use_preset('evaluate')
+        self.proposal_target_creator = ProposalTargetCreator(loc_normalize_mean=loc_normalize_mean,
+                                                             loc_normalize_std=loc_normalize_std)
 
     @property
     def n_class(self):
@@ -71,7 +74,7 @@ class BaseFasterRCNN(nn.Module):
     # maybe batch inference
 
     @torch.no_grad()
-    def predict(self, imgs, visualize=False):
+    def predict(self, imgs, gt_box, gt_label, visualize=False):
         self.eval()
         if visualize:
             self.use_preset('visualize')
@@ -89,11 +92,15 @@ class BaseFasterRCNN(nn.Module):
         bboxes = list()
         labels = list()
         scores = list()
-
+        roi_box = None
+        gt_roi_label = None
         for img, size in zip(prepared_imgs, sizes):
             img = at.totensor(img[None]).float()
             scale = img.shape[3] / size[1]
             roi_cls_loc, roi_scores, rois = self.forward(img)
+            _, gt_roi_loc, gt_roi_label = self.proposal_target_creator.single_forward(rois[0], gt_box, gt_label)
+            roi_box = loc2bbox(rois[0, :128].reshape((-1, 4)), gt_roi_loc.reshape((-1, 4)))
+
             roi_scores = roi_scores.data
             roi_cls_loc = roi_cls_loc.data
             rois = at.totensor(rois) / scale
@@ -125,7 +132,7 @@ class BaseFasterRCNN(nn.Module):
             scores.append(score)
         self.use_preset('evaluate')
         self.train()
-        return bboxes, labels, scores
+        return bboxes, labels, scores, roi_box, gt_roi_label
 
     def get_optimizer(self):
         lr = opt.lr
